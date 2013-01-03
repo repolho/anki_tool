@@ -1,7 +1,8 @@
 #! /usr/bin/python3
 print("WARNING: this software is alpha. Don't use it on an unbacked-up collection, at the risk of corrupting it and losing your data.", end='\n\n')
 
-# TODO: add cards, search cards
+# TODO: add cards, expand options for searching cards (e.g. searching for card
+# type)
 
 import sys
 import os
@@ -136,10 +137,21 @@ def rename_tags(cursor, tags, remove=False):
 def remove_tags(cursor, tags):
     rename_tags(cursor, tags, remove=True)
 
+def search_cards(cursor, regexps):
+    success = False
+    for regex in regexps:
+        cursor.execute('select flds,sfld from notes')
+        for row in cursor:
+            if re.search(regex, row[0]) != None:
+                print(row[1])
+                success = True
+    return success
+
 # command line command -> handler function
 commands = dict({
     'rm_tags': remove_tags,
-    'mv_tags': rename_tags
+    'mv_tags': rename_tags,
+    'search': search_cards 
     })
 
 # Handling errors is command line
@@ -165,7 +177,7 @@ cursor = connection.cursor()
 
 # executing and committing transactions
 success = commands[command](cursor, args)
-if success:
+if success and connection.in_transaction:
     connection.commit()
 
 # cleaning up
