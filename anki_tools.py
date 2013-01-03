@@ -2,7 +2,7 @@
 print("WARNING: this software is alpha. Don't use it on an unbacked-up collection, at the risk of corrupting it and losing your data.", end='\n\n')
 
 # TODO: add cards, expand options for searching cards (e.g. searching for card
-# type and tags)
+# type)
 
 import sys
 import os
@@ -157,10 +157,11 @@ def remove_tags(cursor, tags):
 def search_cards(cursor, regexps):
     success = False
     for regex in regexps:
-        cursor.execute('select flds,sfld from notes')
+        cursor.execute('select flds,tags,sfld from notes')
         for row in cursor:
-            if re.search(regex, row[0]) != None:
-                print(row[1])
+            r = re.search(regex, row[0]+row[1])
+            if r != None:
+                print('found ‘'+r.group()+'’ in card ‘'+row[2]+'’')
                 success = True
     return success
 
