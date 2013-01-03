@@ -2,7 +2,7 @@
 print("WARNING: this software is alpha. Don't use it on an unbacked-up collection, at the risk of corrupting it and losing your data.", end='\n\n')
 
 # TODO: add cards, expand options for searching cards (e.g. searching for card
-# type)
+# type and tags)
 
 import sys
 import os
@@ -16,23 +16,27 @@ def get_index(target, value):
             return i
     return None
 
-def replace_field(cursor, row, field_number, newstr):
-    newtuple = tuple(row)[:field_number]+(tagstr,)+tuple(row)[field_number+1:]
+def replace_field(cursor, table, row, field_number, newstr):
+    newtuple = tuple(row)[:field_number]+(newstr,)+tuple(row)[field_number+1:]
     # template should be "... values (?,?,?,...,?)" with as many "?" as there
     # are items in the tuple; the [:-1] is meant to remove the last comma
-    templatestr = "insert or replace into col values ("+("?,"*len(row))[:-1]+")"
+    templatestr = ("insert or replace into "+table+
+                   " values ("+("?,"*len(row))[:-1]+")")
 
     try:
         cursor.execute(templatestr, newtuple)
     except sqlite3.OperationalError:
-        print("Couldn't execute transaction because database is locked.",
-              "Quit anki and try again.", sep='\n', file=sys.stderr)
+        print("Couldn't execute transaction. Is the database locked?",
+              file=sys.stderr)
         raise
 
-def rename_tag_in_cards(cursor, regex, dst):
+def rename_tag_in_cards(cursor, tag, dst):
+    """Renames a single tag in all cards"""
     # for building the new tuple
     i = -1
-    cursor.execute("select * from notes")
+    n = 0
+    cursor.execute("select * from notes where tags like '%{}%'".format(tag))
+    found = []
     for row in cursor:
         if i == -1:
             i = get_index(row.keys(), "tags")
@@ -45,9 +49,15 @@ def rename_tag_in_cards(cursor, regex, dst):
         # Searching again because sql will return tags containing the tag we're
         # looking for, e.g. if src is 'a', sql will return 'a', 'ab', etc. We
         # will only rename the exact match
+        if tag in tags:
+            found.append(list(row))
+
+    for row in found:
+        tags = row[i].split()
         replaced = False
         for j in range(0, len(tags)):
-            if re.search(regex, tags[j]) != None:
+            if tag == tags[j]:
+                n += 1
                 if dst == None or dst in tags:
                     del tags[j]
                 else:
@@ -56,27 +66,37 @@ def rename_tag_in_cards(cursor, regex, dst):
         if replaced:
             tagstr = ' '.join(tags)
             try:
-                replace_field(cursor, row, i, tagstr)
+                replace_field(cursor, 'notes', row, i, tagstr)
             except sqlite3.OperationalError:
                 raise
 
-def rename_tags(cursor, tags, remove=False):
-    """Renames or removes all tags matching regular expressions"""
+    if n > 0:
+        if dst != None:
+            verb = 'renamed'
+        else:
+            verb = 'removed'
+        print('tag ‘'+tag+'’ successfully', verb, 'in',
+               n, 'cards')
+    else:
+        print('tag ‘'+tag+'’ not found in any cards')
 
-    if not remove and len(tags) < 2:
-        print('Usage: mv_tags regex [regex]... destination',
+def rename_tags(cursor, args, remove=False):
+    """Renames or removes all args matching regular expressions"""
+
+    if not remove and len(args) < 2:
+        print('Usage: mv_args regex [regex]... destination',
               file=sys.stderr)
         return False
-    elif remove and len(tags) == 0:
-            print('Usage: rm_tags regex [regex]...',
-                  file=sys.stderr)
+    elif remove and len(args) == 0:
+        print('Usage: rm_args regex [regex]...',
+              file=sys.stderr)
         return False
     if not remove:
-        dst = tags[-1]
-        srcs = tags[:-1]
+        dst = args[-1]
+        srcs = args[:-1]
     else:
         dst = None
-        srcs = tags
+        srcs = args
 
     cursor.execute("select * from col")
     row = cursor.fetchone()
@@ -89,45 +109,42 @@ def rename_tags(cursor, tags, remove=False):
 
     # dict({"tag1": -1, "tag2": -1})
     try:
-        return ast.literal_eval(row[0])
+        tagsdict = ast.literal_eval(row[i])
     except ValueError:
-        print("Couldn't decode tags string:", row[0], file=sys.stderr)
+        print("Couldn't decode tags string:", row[i], file=sys.stderr)
         return False
 
     n = 0
     for target in srcs:
         found = False
-        for tag in tagsdict:
-            if re.search(target, tag):
+        keys = list(tagsdict.keys())
+        for tag in keys:
+            if re.search(target, tag) != None:
                 found = True
                 n += 1
-                del tagsdict[target]
+                del tagsdict[tag]
                 if dst != None and dst not in tagsdict:
                     tagsdict[dst] = -1
 
                 try:
-                    rename_tag_in_cards(cursor, target, dst)
+                    rename_tag_in_cards(cursor, tag, dst)
                 except sqlite3.OperationalError:
                     return False
         if not found:
             print("Couldn't find tags matching ‘{}’, ignoring".format(target),
                   file=sys.stderr)
 
+    tagstr = str(tagsdict).replace("'", '"')
+    try:
+        replace_field(cursor, 'col', row, i, tagstr)
+    except sqlite3.OperationalError:
+        return False
+
     if n == 0:
         if not remove:
             print('No tags were renamed', file=sys.stderr)
         else:
             print('No tags were removed', file=sys.stderr)
-        return False
-
-    tagstr = str(tagsdict).replace("'", '"')
-    try:
-        replace_field(cursor, row, i, tagstr)
-    except sqlite3.OperationalError:
-        return False
-
-    if cursor.rowcount <= 0:
-        print("Error replacing row in database", file=sys.stderr)
         return False
     else:
         print("{} tag(s) successfully renamed".format(n))
