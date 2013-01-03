@@ -1,5 +1,4 @@
 #! /usr/bin/python3
-print("WARNING: this software is alpha. Don't use it on an unbacked-up collection, at the risk of corrupting it and losing your data.", end='\n\n')
 
 # TODO: add cards, expand options for searching cards (e.g. searching for card
 # type)
@@ -9,6 +8,8 @@ import os
 import sqlite3
 import re
 import ast
+
+print("WARNING: this software is alpha. Don't use it on an unbacked-up collection, at the risk of corrupting it and losing your data.", end='\n\n', file=sys.stderr)
 
 def get_index(target, value):
     for i in range(0, len(target)):
