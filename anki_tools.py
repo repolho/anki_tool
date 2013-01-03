@@ -64,7 +64,7 @@ def rename_tag_in_cards(cursor, tag, dst):
                     tags[j] = dst
                 replaced = True
         if replaced:
-            tagstr = ' '.join(tags)
+            tagstr = ' '+' '.join(tags)+' '
             try:
                 replace_field(cursor, 'notes', row, i, tagstr)
             except sqlite3.OperationalError:
