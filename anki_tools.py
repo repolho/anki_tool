@@ -141,14 +141,15 @@ def rename_tags(cursor, args, remove=False):
     except sqlite3.OperationalError:
         return False
 
+    if not remove:
+        verb = 'renamed'
+    else:
+        verb = 'removed'
     if n == 0:
-        if not remove:
-            print('No tags were renamed', file=sys.stderr)
-        else:
-            print('No tags were removed', file=sys.stderr)
+        print('No tags were', verb, file=sys.stderr)
         return False
     else:
-        print("{} tag(s) successfully renamed".format(n))
+        print(n, 'tag(s) successfully', verb)
 
     return True
 
