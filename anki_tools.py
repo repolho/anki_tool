@@ -7,7 +7,7 @@ import sys
 import os
 import sqlite3
 import re
-import ast
+import json
 import time
 
 def get_index(target, value):
@@ -77,8 +77,9 @@ def rename_tags(cursor, args, remove=False):
     row = cursor.fetchone()
 
     try:
-        # format is {"tag1": -1, "tag2": -1}
-        tagsdict = ast.literal_eval(row['tags'])
+        tagsdict = json.loads(row['tags'])
+        if type(tagsdict) != dict:
+            raise ValueError
     except ValueError:
         print("Couldn't decode tags string:", row['tags'], file=sys.stderr)
         return False
@@ -103,7 +104,7 @@ def rename_tags(cursor, args, remove=False):
             print("Couldn't find tags matching ‘{}’, ignoring".format(target),
                   file=sys.stderr)
 
-    tagstr = str(tagsdict).replace("'", '"')
+    tagstr = json.dumps(tagsdict)
     cursor.execute('update col set tags=?,mod=? where id=?',
                    (tagstr, int(time.time()), row['id']))
 
