@@ -51,9 +51,9 @@ def rename_tag_in_cards(cursor, tag, dst):
         else:
             verb = 'removed'
         print('tag ‘'+tag+'’ successfully', verb, 'in',
-               n, 'cards')
+               n, 'cards', file=sys.stderr)
     else:
-        print('tag ‘'+tag+'’ not found in any cards')
+        print('tag ‘'+tag+'’ not found in any cards', file=sys.stderr)
 
 def rename_tags(cursor, args, remove=False):
     """Renames or removes all args matching regular expressions"""
@@ -115,7 +115,7 @@ def rename_tags(cursor, args, remove=False):
         print('No tags were', verb, file=sys.stderr)
         return False
     else:
-        print(n, 'tag(s) successfully', verb)
+        print(n, 'tag(s) successfully', verb, file=sys.stderr)
 
     return True
 
@@ -124,14 +124,23 @@ def remove_tags(cursor, tags):
 
 def search_cards(cursor, regexps):
     success = False
-    for regex in regexps:
-        cursor.execute('select flds,tags,sfld from notes')
-        for row in cursor:
+    cursor.execute('select id,flds,tags,sfld from notes')
+    for row in cursor:
+        groups = []
+        found = True
+        for regex in regexps:
             r = re.search(regex, row['flds']+row['tags'])
             if r != None:
-
-                print('found ‘'+r.group()+'’ in card ‘'+row['sfld']+'’')
-                success = True
+                groups.append(r.group())
+            else:
+                found = False
+                break
+        if found:
+            # printing only the id to stdout, so output can be piped somewhere
+            print('found '+' and '.join(groups)+' in card ‘'+row['sfld']+'’, id:',
+                  file=sys.stderr)
+            print(row['id'])
+            success = True
     return success
 
 # command line command -> handler function
