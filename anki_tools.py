@@ -10,12 +10,6 @@ import re
 import json
 import time
 
-def get_index(target, value):
-    for i in range(0, len(target)):
-        if target[i] == value:
-            return i
-    return None
-
 def rename_tag_in_cards(cursor, tag, dst):
     """Renames a single tag in all cards"""
     n = 0
