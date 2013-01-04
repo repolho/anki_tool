@@ -10,8 +10,6 @@ import re
 import ast
 import time
 
-print("WARNING: this software is alpha. Don't use it on an unbacked-up collection, at the risk of corrupting it and losing your data.", end='\n\n', file=sys.stderr)
-
 def get_index(target, value):
     for i in range(0, len(target)):
         if target[i] == value:
@@ -167,7 +165,17 @@ cursor = connection.cursor()
 # executing and committing transactions
 success = commands[command](cursor, args)
 if success and connection.in_transaction:
-    connection.commit()
+    print("\nWARNING: this software is alpha. Backup your collection before",
+          "commiting any changes. Check that everything went as expected before",
+          "modifying the deck in anki (including reviewing cards), at the risk of",
+          "having to restore your backup and losing your changes.\n",
+          file=sys.stderr)
+    answer = input('Commit changes (y/N)? ')
+    if answer == 'y' or answer == 'Y':
+        connection.commit()
+    else:
+        print('Canceling changes, your deck was not modified', file=sys.stderr)
+        success = False
 
 # cleaning up
 cursor.close()
