@@ -56,7 +56,7 @@ def rename_tag_in_cards(cursor, tag, dst):
         print('tag ‘'+tag+'’ not found in any cards', file=sys.stderr)
 
 def rename_tags(cursor, args, remove=False):
-    """Renames or removes all args matching regular expressions"""
+    """Renames or removes all tags matching regular expressions"""
 
     if not remove and len(args) < 2:
         print('Usage: mv_args regex [regex]... destination',
@@ -176,9 +176,9 @@ cursor = connection.cursor()
 success = commands[command](cursor, args)
 if success and connection.in_transaction:
     print("\nWARNING: this software is alpha. Backup your collection before",
-          "commiting any changes. Check that everything went as expected before",
+          "committing any changes. Check that everything went as expected before",
           "modifying the deck in anki (including reviewing cards), at the risk of",
-          "having to restore your backup and losing your changes.\n",
+          "having to restore your backup later and losing your changes.\n",
           file=sys.stderr)
     answer = input('Commit changes (y/N)? ')
     if answer == 'y' or answer == 'Y':
