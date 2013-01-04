@@ -41,8 +41,8 @@ def rename_tag_in_cards(cursor, tag, dst):
             tagstr = ''
         else:
             tagstr = ' {} '.format(' '.join(tags))
-        cursor.execute('update notes set tags=?,mod=? where id=?',
-                       (tagstr, int(time.time()), row['id']))
+        cursor.execute('update notes set tags=?,mod=?,usn=? where id=?',
+                       (tagstr, int(time.time()), -1, row['id']))
         n += 1
 
     if n > 0:
@@ -106,7 +106,7 @@ def rename_tags(cursor, args, remove=False):
 
     tagstr = json.dumps(tagsdict)
     cursor.execute('update col set tags=?,mod=? where id=?',
-                   (tagstr, int(time.time()), row['id']))
+                   (tagstr, int(time.time()*1000), row['id']))
 
     if not remove:
         verb = 'renamed'
