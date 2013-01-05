@@ -9,6 +9,7 @@ import sqlite3
 import re
 import json
 import time
+import collections
 
 def rename_tag_in_cards(cursor, tag, dst):
     """Renames a single tag in all cards"""
@@ -69,6 +70,9 @@ def rename_tags(cursor, args, remove=False):
 
     cursor.execute("select * from col where id=1")
     row = cursor.fetchone()
+    if not row:
+        print("Couldn't read collection.")
+        return False
 
     try:
         tagsdict = json.loads(row['tags'])
@@ -138,14 +142,69 @@ def search_cards(cursor, regexps):
             success = True
     return success
 
+models = None
+def read_models(cursor):
+    global models
+    if not models:
+        cursor.execute('select models from col where id=1')
+        row = cursor.fetchone()
+        if not row:
+            raise Error("Couldn't read collection.")
+        else:
+            models = json.loads(row['models'])
+
+def create_fields_dict(cursor, model_id, fieldsstr):
+    if not models:
+        read_models(cursor)
+    # creating fields dict
+    fields = collections.OrderedDict()
+    field_values = fieldsstr.split('\x1f')
+    i = 0
+    for field in models[str(model_id)]['flds']:
+        if i < len(field_values):
+            fields[field['name']] = field_values[i]
+            i += 1
+        else:
+            fields[field['name']] = ''
+    return fields
+
+def print_fields(cursor, model_id, fieldsstr, _json):
+    fields = create_fields_dict(cursor, model_id, fieldsstr)
+    # printing results
+    if not _json:
+        for name in fields:
+            print('## {} ##'.format(name), file=sys.stderr)
+            print(fields[name])
+    else:
+        print(json.dumps(fields))
+
+def print_cards_fields(cursor, ids, _json=False):
+    success = False
+    for _id in ids:
+        cursor.execute('select mid,flds from notes where id=?', (_id,))
+        row = cursor.fetchone()
+        if not row:
+            print('Card with id', _id, 'not found, skipping', file=sys.stderr)
+        else:
+            success = True
+            if not _json:
+                print('# Card {} #'.format(_id), file=sys.stderr)
+            print_fields(cursor, row['mid'], row['flds'], _json=_json)
+    return success
+
+def dump_cards_fields(cursor, ids):
+    print_cards_fields(cursor, ids, _json=True)
+
 # command line command -> handler function
 commands = dict({
     'rm_tags': remove_tags,
     'mv_tags': rename_tags,
-    'search': search_cards 
+    'search': search_cards,
+    'print_fields': print_cards_fields,
+    'dump_fields': dump_cards_fields
     })
 
-# Handling errors is command line
+# handling errors in command line
 if len(sys.argv) < 4 or not os.path.exists(sys.argv[1]) or sys.argv[2] not in commands.keys():
     if len(sys.argv) >= 2 and not os.path.exists(sys.argv[1]):
         print("File not found:", sys.argv[1], file=sys.stderr)
