@@ -168,15 +168,34 @@ def create_fields_dict(cursor, model_id, fieldsstr):
             fields[field['name']] = ''
     return fields
 
-def print_fields(cursor, model_id, fieldsstr, _json):
+# These two functions are needed to communicate ordered dicts through json.
+def ordered_dict_to_lists(dic):
+    keys = []
+    values = []
+    for key in dic:
+        keys.append(key)
+        values.append(dic[key])
+    return keys, values
+def lists_to_ordered_dict(keys, values):
+    r = collections.OrderedDict()
+    for i in range(0, len(keys)):
+        if i < len(values):
+            r[keys[i]] = values[i]
+        else:
+            r[keys[i]] = ''
+    return r
+
+def print_fields(cursor, note_id, model_id, fieldsstr, _json):
     fields = create_fields_dict(cursor, model_id, fieldsstr)
     # printing results
     if not _json:
+        print('# Card {} #'.format(note_id), file=sys.stderr)
         for name in fields:
             print('## {} ##'.format(name), file=sys.stderr)
             print(fields[name])
     else:
-        print(json.dumps(fields))
+        card = {note_id: ordered_dict_to_lists(fields)}
+        print(json.dumps(card))
 
 def print_cards_fields(cursor, ids, _json=False):
     success = False
@@ -187,22 +206,39 @@ def print_cards_fields(cursor, ids, _json=False):
             print('Card with id', _id, 'not found, skipping', file=sys.stderr)
         else:
             success = True
-            if not _json:
-                print('# Card {} #'.format(_id), file=sys.stderr)
-            print_fields(cursor, row['mid'], row['flds'], _json=_json)
+            print_fields(cursor, _id, row['mid'], row['flds'], _json=_json)
     return success
 
 def dump_cards_fields(cursor, ids):
     print_cards_fields(cursor, ids, _json=True)
 
+def replace_fields(cursor, json_strings):
+    success = False
+    for string in json_strings:
+        cards = json.loads(string)
+        if type(cards) != dict:
+            print('Malformed string, aborting:', string, file=sys.stderr)
+            return False
+        for _id in cards:
+            card = cards[_id]
+            if len(card) != 2 or type(card[0]) != list or type(card[1]) != list:
+                print('Malformed string, aborting:', string, file=sys.stderr)
+                return False
+            fieldsstr = '\x1f'.join(card[1])
+            cursor.execute('update notes set flds=?,mod=?,usn=? where id=?',
+                           (fieldsstr, int(time.time()), -1, _id))
+            success = True
+    return success
+
 # command line command -> handler function
-commands = dict({
+commands = {
     'rm_tags': remove_tags,
     'mv_tags': rename_tags,
     'search': search_cards,
     'print_fields': print_cards_fields,
-    'dump_fields': dump_cards_fields
-    })
+    'dump_fields': dump_cards_fields,
+    'replace_fields': replace_fields
+    }
 
 # handling errors in command line
 if len(sys.argv) < 4 or not os.path.exists(sys.argv[1]) or sys.argv[2] not in commands.keys():
