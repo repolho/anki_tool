@@ -120,17 +120,23 @@ def remove_tags(cursor, tags):
 
 def search_cards(cursor, regexps):
     success = False
-    cursor.execute('select id,flds,tags,sfld from notes')
+    cursor.execute('select id,mid,flds,tags,sfld from notes')
     for row in cursor:
+        tags = row['tags'].split()
+        ids = [str(row['id']), str(row['mid'])]
         groups = []
-        found = True
         for regex in regexps:
-            r = re.search(regex, row['flds']+row['tags'])
-            if r != None:
-                groups.append(r.group())
-            else:
-                found = False
+            found = False
+            # searching fields, tags and ids for pattern
+            for string in tags+ids+[row['flds']]:
+                r = re.search(regex, string)
+                if r != None:
+                    groups.append(r.group())
+                    found = True
+            # if one pattern failed to match, don't bother with the rest
+            if not found:
                 break
+        # found will only be true if all patterns matched something
         if found:
             # printing only the id to stdout, so output can be piped somewhere
             print('found '+' and '.join(groups)+' in card ‘'+row['sfld']+'’, id:',
