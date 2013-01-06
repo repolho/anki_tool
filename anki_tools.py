@@ -1,8 +1,5 @@
 #! /usr/bin/python3
 
-# TODO: add cards, expand options for searching cards (e.g. searching for card
-# type)
-
 import sys
 import os
 import sqlite3

@@ -1,0 +1,17 @@
+move main() into a function
+only execute if being run from the command line (not when being sourced by
+another script)
+
+improve search
+separate tags and check for matches individually; check for match against card
+id, deck id and model id
+
+add add_cards
+
+add dump_cards
+include at least note's contents (reversed if ord==1 (or just print "forward"
+and "reverse"?)), tags, difficulty, scheduled date
+
+dump a single dictionary in dump_fields
+
+turn *_fields into *_notes and include tags?
