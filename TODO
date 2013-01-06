@@ -1,9 +1,12 @@
 add add_cards
 
-add dump_cards
+add dump_cards, replace_cards
 include at least note's contents (reversed if ord==1 (or just print "forward"
 and "reverse"?)), tags, difficulty, scheduled date
+search by note id (but in table cards)
 
 dump a single dictionary in dump_fields
 
-turn *_fields into *_notes and include tags?
+add dump_tags and replace_tags, to use together with *_fields
+
+add list_models, list_decks
