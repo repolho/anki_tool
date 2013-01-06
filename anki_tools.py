@@ -43,10 +43,10 @@ def rename_tag_in_cards(cursor, tag, dst):
             verb = 'renamed'
         else:
             verb = 'removed'
-        print('tag ‘'+tag+'’ successfully', verb, 'in',
-               n, 'cards', file=sys.stderr)
+        print('Tag ‘'+tag+'’ successfully', verb, 'in',
+               n, 'cards.', file=sys.stderr)
     else:
-        print('tag ‘'+tag+'’ not found in any cards', file=sys.stderr)
+        print('Tag ‘'+tag+'’ not found in any cards.', file=sys.stderr)
 
 def rename_tags(cursor, args, remove=False):
     """Renames or removes all tags matching regular expressions"""
@@ -97,8 +97,12 @@ def rename_tags(cursor, args, remove=False):
                 except sqlite3.OperationalError:
                     return False
         if not found:
-            print("Couldn't find tags matching ‘{}’, ignoring".format(target),
-                  file=sys.stderr)
+            print("Couldn't find tags matching ‘{}’, searching cards for exact "
+                  "string.".format(target), file=sys.stderr)
+            try:
+                rename_tag_in_cards(cursor, target, dst)
+            except sqlite3.OperationalError:
+                return False
 
     tagstr = json.dumps(tagsdict)
     cursor.execute('update col set tags=?,mod=? where id=?',
@@ -140,7 +144,7 @@ def search_cards(cursor, regexps):
         # found will only be true if all patterns matched something
         if found:
             # printing only the id to stdout, so output can be piped somewhere
-            print('found '+' and '.join(groups)+' in card ‘'+row['sfld']+'’, id:',
+            print('Found '+' and '.join(groups)+' in card ‘'+row['sfld']+'’, id:',
                   file=sys.stderr)
             print(row['id'])
             success = True
