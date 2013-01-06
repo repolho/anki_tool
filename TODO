@@ -1,7 +1,3 @@
-move main() into a function
-only execute if being run from the command line (not when being sourced by
-another script)
-
 add add_cards
 
 add dump_cards

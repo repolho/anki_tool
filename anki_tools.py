@@ -2,6 +2,7 @@
 
 import sys
 import os
+import os.path
 import sqlite3
 import re
 import json
@@ -233,56 +234,63 @@ def replace_fields(cursor, json_strings):
             success = True
     return success
 
-# command line command -> handler function
-commands = {
-    'rm_tags': remove_tags,
-    'mv_tags': rename_tags,
-    'search': search_cards,
-    'print_fields': print_cards_fields,
-    'dump_fields': dump_cards_fields,
-    'replace_fields': replace_fields
-    }
+def run():
+    # command line command -> handler function
+    commands = {
+        'rm_tags': remove_tags,
+        'mv_tags': rename_tags,
+        'search': search_cards,
+        'print_fields': print_cards_fields,
+        'dump_fields': dump_cards_fields,
+        'replace_fields': replace_fields
+        }
 
-# handling errors in command line
-if len(sys.argv) < 4 or not os.path.exists(sys.argv[1]) or sys.argv[2] not in commands.keys():
-    if len(sys.argv) >= 2 and not os.path.exists(sys.argv[1]):
-        print("File not found:", sys.argv[1], file=sys.stderr)
-    if len(sys.argv) >= 3 and sys.argv[2] not in commands.keys():
-        print("Unknown command:", sys.argv[2], file=sys.stderr)
-    print("Usage: {} anki_collection_file command arguments\n"
-          "Available commands: {}".format(sys.argv[0],
-                                          " ".join(commands.keys())),
-          file=sys.stderr)
-    exit(1)
+    # handling errors in command line
+    if len(sys.argv) < 4 or not os.path.exists(sys.argv[1]) or sys.argv[2] not in commands.keys():
+        if len(sys.argv) >= 2 and not os.path.exists(sys.argv[1]):
+            print("File not found:", sys.argv[1], file=sys.stderr)
+        if len(sys.argv) >= 3 and sys.argv[2] not in commands.keys():
+            print("Unknown command:", sys.argv[2], file=sys.stderr)
+        print("Usage: {} anki_collection_file command arguments\n"
+              "Available commands: {}".format(sys.argv[0],
+                                              " ".join(commands.keys())),
+              file=sys.stderr)
+        exit(1)
 
-collection = sys.argv[1]
-command = sys.argv[2]
-args = sys.argv[3:]
+    collection = sys.argv[1]
+    command = sys.argv[2]
+    args = sys.argv[3:]
 
-# connecting to the database
-connection = sqlite3.connect(collection)
-connection.row_factory = sqlite3.Row
-cursor = connection.cursor()
+    # connecting to the database
+    connection = sqlite3.connect(collection)
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
 
-# executing and committing transactions
-success = commands[command](cursor, args)
-if success and connection.in_transaction:
-    print("\nWARNING: this software is alpha. Backup your collection before",
-          "committing any changes. Check that everything went as expected before",
-          "modifying the deck in anki (including reviewing cards), at the risk of",
-          "having to restore your backup later and losing your changes.\n",
-          file=sys.stderr)
-    answer = input('Commit changes (y/N)? ')
-    if answer == 'y' or answer == 'Y':
-        connection.commit()
+    # executing and committing transactions
+    success = commands[command](cursor, args)
+    if success and connection.in_transaction:
+        print("\nWARNING: this software is alpha. Backup your collection before",
+              "committing any changes. Check that everything went as expected before",
+              "modifying the deck in anki (including reviewing cards), at the risk of",
+              "having to restore your backup later and losing your changes.\n",
+              file=sys.stderr)
+        answer = input('Commit changes (y/N)? ')
+        if answer == 'y' or answer == 'Y':
+            connection.commit()
+        else:
+            print('Canceling changes, your deck was not modified', file=sys.stderr)
+            success = False
+
+    # cleaning up
+    cursor.close()
+    connection.close()
+    if success:
+        exit(0)
     else:
-        print('Canceling changes, your deck was not modified', file=sys.stderr)
-        success = False
+        exit(2)
 
-# cleaning up
-cursor.close()
-connection.close()
-if success:
-    exit(0)
-else:
-    exit(2)
+# Only run if being executed directly, so other scripts can source this one and
+# call its functions. Note that, in this case, the caller is responsible for
+# opening and closing the database and commiting any changes.
+if os.path.splitext(os.path.basename(sys.argv[0]))[0] == 'anki_tools':
+    run()
