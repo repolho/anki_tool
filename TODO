@@ -1,3 +1,5 @@
+add switch to force committing (especially for when reading from stdin)
+
 add add_cards
 
 add dump_cards, replace_cards

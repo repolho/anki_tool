@@ -48,23 +48,24 @@ def rename_tag_in_cards(cursor, tag, dst):
     else:
         print('Tag ‘'+tag+'’ not found in any cards.', file=sys.stderr)
 
-def rename_tags(cursor, args, remove=False):
+def rename_tags(cursor, tags, remove=False):
     """Renames or removes all tags matching regular expressions"""
 
-    if not remove and len(args) < 2:
-        print('Usage: mv_args regex [regex]... destination',
+    if not remove and len(tags) < 2:
+        print('Usage: mv_tags regex [regex]... destination',
               file=sys.stderr)
         return False
-    elif remove and len(args) == 0:
-        print('Usage: rm_args regex [regex]...',
-              file=sys.stderr)
-        return False
+    elif remove and not tags:
+        tags = []
+        for tag in sys.stdin:
+            tags.append(tag.rstrip())
+
     if not remove:
-        dst = args[-1]
-        srcs = args[:-1]
+        dst = tags[-1]
+        srcs = tags[:-1]
     else:
         dst = None
-        srcs = args
+        srcs = tags
 
     cursor.execute("select * from col where id=1")
     row = cursor.fetchone()
@@ -124,6 +125,11 @@ def remove_tags(cursor, tags):
     return rename_tags(cursor, tags, remove=True)
 
 def search_cards(cursor, regexps):
+    if not regexps:
+        regexps = []
+        for regex in sys.stdin:
+            regexps.append(regex.rstrip())
+
     success = False
     cursor.execute('select id,mid,flds,tags,sfld from notes')
     for row in cursor:
@@ -201,13 +207,17 @@ def print_fields(cursor, note_id, model_id, fieldsstr, _json):
         for name in fields:
             print('## {} ##'.format(name), file=sys.stderr)
             print(fields[name])
+        print()
     else:
         card = {note_id: ordered_dict_to_lists(fields)}
         print(json.dumps(card))
 
 def print_cards_fields(cursor, ids, _json=False):
     success = False
+    if not ids:
+        ids = sys.stdin
     for _id in ids:
+        _id = _id.rstrip()
         cursor.execute('select mid,flds from notes where id=?', (_id,))
         row = cursor.fetchone()
         if not row:
@@ -250,7 +260,7 @@ def run():
         }
 
     # handling errors in command line
-    if len(sys.argv) < 4 or not os.path.exists(sys.argv[1]) or sys.argv[2] not in commands.keys():
+    if len(sys.argv) < 3 or not os.path.exists(sys.argv[1]) or sys.argv[2] not in commands.keys():
         if len(sys.argv) >= 2 and not os.path.exists(sys.argv[1]):
             print("File not found:", sys.argv[1], file=sys.stderr)
         if len(sys.argv) >= 3 and sys.argv[2] not in commands.keys():
@@ -273,16 +283,21 @@ def run():
     # executing and committing transactions
     success = commands[command](cursor, args)
     if success and connection.in_transaction:
-        print("\nWARNING: this software is alpha. Backup your collection before",
-              "committing any changes. Check that everything went as expected before",
-              "modifying the deck in anki (including reviewing cards), at the risk of",
-              "having to restore your backup later and losing your changes.\n",
+        print("\nWARNING: this software is alpha. Backup your collection "
+              "before committing any changes. Check that everything went as "
+              "expected before modifying the deck in anki (including reviewing "
+              "cards), at the risk of having to restore your backup later and "
+              "losing your changes.\n",
               file=sys.stderr)
-        answer = input('Commit changes (y/N)? ')
+        try:
+            answer = input('Commit changes (y/N)? ')
+        except (EOFError, KeyboardInterrupt):
+            answer = None
         if answer == 'y' or answer == 'Y':
             connection.commit()
         else:
-            print('Canceling changes, your deck was not modified', file=sys.stderr)
+            print('\nCanceling changes, your deck was not modified.',
+                  file=sys.stderr)
             success = False
 
     # cleaning up
