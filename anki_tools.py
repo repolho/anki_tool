@@ -147,8 +147,8 @@ def search_cards(conn, regexps):
         # found will only be true if all patterns matched something
         if found:
             # printing only the id to stdout, so output can be piped somewhere
-            print('Found '+' and '.join(groups)+' in card ‘'+row['sfld']+'’, id:',
-                  file=sys.stderr)
+            print('Found ', ' and '.join(groups), ' in card ‘', row['sfld'],
+                  '’, id:', sep='', file=sys.stderr)
             print(row['id'])
             success = True
     return success
