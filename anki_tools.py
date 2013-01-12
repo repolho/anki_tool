@@ -203,16 +203,17 @@ def print_fields(cursor, note_id, model_id, fieldsstr, _json):
     fields = create_fields_dict(cursor, model_id, fieldsstr)
     # printing results
     if not _json:
-        print('# Card {} #'.format(note_id), file=sys.stderr)
+        print('# Note {} #'.format(note_id), file=sys.stderr)
         for name in fields:
             print('## {} ##'.format(name), file=sys.stderr)
             print(fields[name])
         print()
+        return None
     else:
-        card = {note_id: ordered_dict_to_lists(fields)}
-        print(json.dumps(card))
+        return ordered_dict_to_lists(fields)
 
-def print_cards_fields(cursor, ids, _json=False):
+def print_notes_fields(cursor, ids, _json=False):
+    cards = dict()
     success = False
     if not ids:
         ids = sys.stdin
@@ -221,14 +222,18 @@ def print_cards_fields(cursor, ids, _json=False):
         cursor.execute('select mid,flds from notes where id=?', (_id,))
         row = cursor.fetchone()
         if not row:
-            print('Card with id', _id, 'not found, skipping', file=sys.stderr)
+            print('Note with id', _id, 'not found, skipping', file=sys.stderr)
         else:
             success = True
-            print_fields(cursor, _id, row['mid'], row['flds'], _json=_json)
+            cards[_id] = print_fields(cursor, _id, row['mid'], row['flds'],
+                                      _json=_json)
+                
+    if _json:
+        print(json.dumps(cards))
     return success
 
-def dump_cards_fields(cursor, ids):
-    print_cards_fields(cursor, ids, _json=True)
+def dump_notes_fields(cursor, ids):
+    print_notes_fields(cursor, ids, _json=True)
 
 def replace_fields(cursor, json_strings):
     success = False
@@ -300,8 +305,8 @@ def run():
         'rm_tags': remove_tags,
         'mv_tags': rename_tags,
         'search': search_cards,
-        'print_fields': print_cards_fields,
-        'dump_fields': dump_cards_fields,
+        'print_fields': print_notes_fields,
+        'dump_fields': dump_notes_fields,
         'replace_fields': replace_fields,
         'list_models': list_models,
         'list_decks': list_decks

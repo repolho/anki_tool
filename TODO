@@ -9,6 +9,4 @@ include at least note's contents (reversed if ord==1 (or just print "forward"
 and "reverse"?)), tags, difficulty, scheduled date
 search by note id (but in table cards)
 
-dump a single dictionary in dump_fields
-
 add dump_tags and replace_tags, to use together with *_fields
