@@ -26,7 +26,7 @@ def rename_tag_in_cards(cursor, tag, dst):
     for row in found:
         tags = row['tags'].split()
         tags.remove(tag)
-        if dst != None:
+        if dst:
             tags.append(dst)
         # remove duplicates and sort
         tags = sorted(set(tags))
@@ -39,7 +39,7 @@ def rename_tag_in_cards(cursor, tag, dst):
         n += 1
 
     if n > 0:
-        if dst != None:
+        if dst:
             verb = 'renamed'
         else:
             verb = 'removed'
@@ -86,11 +86,11 @@ def rename_tags(cursor, tags, remove=False):
         found = False
         keys = list(tagsdict.keys())
         for tag in keys:
-            if re.search(target, tag) != None:
+            if re.search(target, tag):
                 found = True
                 n += 1
                 del tagsdict[tag]
-                if dst != None:
+                if dst:
                     tagsdict[dst] = -1
 
                 try:
@@ -141,7 +141,7 @@ def search_cards(cursor, regexps):
             # searching fields, tags and ids for pattern
             for string in tags+ids+[row['flds']]:
                 r = re.search(regex, string)
-                if r != None:
+                if r:
                     groups.append(r.group())
                     found = True
             # if one pattern failed to match, don't bother with the rest
@@ -248,6 +248,52 @@ def replace_fields(cursor, json_strings):
             success = True
     return success
 
+def list_models_decks(cursor, regexs, keyword):
+    if keyword not in ['models', 'decks']:
+        raise ValueError('Keyword should be either models or decks: '+keyword)
+
+    if not regexs:
+        regexs.append('.')
+
+    cursor.execute("select {} from col where id=1".format(keyword))
+    row = cursor.fetchone()
+    if not row:
+        print("Couldn't read collection.")
+        return False
+
+    try:
+        dic = json.loads(row[keyword])
+        if type(dic) != dict:
+            raise ValueError
+    except ValueError:
+        print("Couldn't decode", keyword, "string:", row[keyword],
+              file=sys.stderr)
+        return False
+    except IndexError:
+        print("Couldn't find column", keyword, ":", row.keys(),
+              file=sys.stderr)
+        return False
+
+    for key in dic:
+        matches = True
+        for regex in regexs:
+            if (
+                not re.search(regex, dic[key]['name']) and
+                not re.search(regex, key)
+               ):
+                matches = False
+                break
+        if matches:
+            print('# {} #'.format(dic[key]['name']), file=sys.stderr)
+            print(key)
+    return True
+
+def list_models(cursor, regexs):
+    return list_models_decks(cursor, regexs, 'models')
+
+def list_decks(cursor, regexs):
+    return list_models_decks(cursor, regexs, 'decks')
+
 def run():
     # command line command -> handler function
     commands = {
@@ -256,7 +302,9 @@ def run():
         'search': search_cards,
         'print_fields': print_cards_fields,
         'dump_fields': dump_cards_fields,
-        'replace_fields': replace_fields
+        'replace_fields': replace_fields,
+        'list_models': list_models,
+        'list_decks': list_decks
         }
 
     # handling errors in command line
