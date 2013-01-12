@@ -86,7 +86,7 @@ def rename_tags(cursor, tags, remove=False):
         found = False
         keys = list(tagsdict.keys())
         for tag in keys:
-            if re.search(target, tag):
+            if re.search(target, tag, re.I):
                 found = True
                 n += 1
                 del tagsdict[tag]
@@ -140,7 +140,7 @@ def search_cards(cursor, regexps):
             found = False
             # searching fields, tags and ids for pattern
             for string in tags+ids+[row['flds']]:
-                r = re.search(regex, string)
+                r = re.search(regex, string, re.I)
                 if r:
                     groups.append(r.group())
                     found = True
@@ -278,8 +278,8 @@ def list_models_decks(cursor, regexs, keyword):
         matches = True
         for regex in regexs:
             if (
-                not re.search(regex, dic[key]['name']) and
-                not re.search(regex, key)
+                not re.search(regex, dic[key]['name'], re.I) and
+                not re.search(regex, key, re.I)
                ):
                 matches = False
                 break
