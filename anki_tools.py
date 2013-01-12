@@ -9,13 +9,12 @@ import json
 import time
 import collections
 
-def rename_tag_in_cards(cursor, tag, dst):
+def rename_tag_in_cards(conn, tag, dst):
     """Renames a single tag in all cards"""
     n = 0
-    cursor.execute("select * from notes where tags like ?",
-                   ('%'+tag+'%',))
     found = []
-    for row in cursor:
+    for row in conn.execute("select * from notes where tags like ?",
+                            ('%'+tag+'%',)):
         tags = row['tags'].split()
         # Searching again because sql will return tags containing the tag we're
         # looking for, e.g. if src is 'a', sql will return 'a', 'ab', etc. We
@@ -34,7 +33,7 @@ def rename_tag_in_cards(cursor, tag, dst):
             tagstr = ''
         else:
             tagstr = ' {} '.format(' '.join(tags))
-        cursor.execute('update notes set tags=?,mod=?,usn=? where id=?',
+        conn.execute('update notes set tags=?,mod=?,usn=? where id=?',
                        (tagstr, int(time.time()), -1, row['id']))
         n += 1
 
@@ -48,7 +47,7 @@ def rename_tag_in_cards(cursor, tag, dst):
     else:
         print('Tag ‘'+tag+'’ not found in any cards.', file=sys.stderr)
 
-def rename_tags(cursor, tags, remove=False):
+def rename_tags(conn, tags, remove=False):
     """Renames or removes all tags matching regular expressions"""
 
     if not remove and len(tags) < 2:
@@ -67,8 +66,7 @@ def rename_tags(cursor, tags, remove=False):
         dst = None
         srcs = tags
 
-    cursor.execute("select * from col where id=1")
-    row = cursor.fetchone()
+    row = conn.execute("select * from col where id=1").fetchone()
     if not row:
         print("Couldn't read collection.")
         return False
@@ -94,19 +92,19 @@ def rename_tags(cursor, tags, remove=False):
                     tagsdict[dst] = -1
 
                 try:
-                    rename_tag_in_cards(cursor, tag, dst)
+                    rename_tag_in_cards(conn, tag, dst)
                 except sqlite3.OperationalError:
                     return False
         if not found:
             print("Couldn't find tags matching ‘{}’, searching cards for exact "
                   "string.".format(target), file=sys.stderr)
             try:
-                rename_tag_in_cards(cursor, target, dst)
+                rename_tag_in_cards(conn, target, dst)
             except sqlite3.OperationalError:
                 return False
 
     tagstr = json.dumps(tagsdict)
-    cursor.execute('update col set tags=?,mod=? where id=?',
+    conn.execute('update col set tags=?,mod=? where id=?',
                    (tagstr, int(time.time()*1000), row['id']))
 
     if not remove:
@@ -121,18 +119,17 @@ def rename_tags(cursor, tags, remove=False):
 
     return True
 
-def remove_tags(cursor, tags):
-    return rename_tags(cursor, tags, remove=True)
+def remove_tags(conn, tags):
+    return rename_tags(conn, tags, remove=True)
 
-def search_cards(cursor, regexps):
+def search_cards(conn, regexps):
     if not regexps:
         regexps = []
         for regex in sys.stdin:
             regexps.append(regex.rstrip())
 
     success = False
-    cursor.execute('select id,mid,flds,tags,sfld from notes')
-    for row in cursor:
+    for row in conn.execute('select id,mid,flds,tags,sfld from notes'):
         tags = row['tags'].split()
         ids = [str(row['id']), str(row['mid'])]
         groups = []
@@ -157,19 +154,18 @@ def search_cards(cursor, regexps):
     return success
 
 models = None
-def read_models(cursor):
+def read_models(conn):
     global models
     if not models:
-        cursor.execute('select models from col where id=1')
-        row = cursor.fetchone()
+        row = conn.execute('select models from col where id=1').fetchone()
         if not row:
             raise Error("Couldn't read collection.")
         else:
             models = json.loads(row['models'])
 
-def create_fields_dict(cursor, model_id, fieldsstr):
+def create_fields_dict(conn, model_id, fieldsstr):
     if not models:
-        read_models(cursor)
+        read_models(conn)
     # creating fields dict
     fields = collections.OrderedDict()
     field_values = fieldsstr.split('\x1f')
@@ -199,8 +195,8 @@ def lists_to_ordered_dict(keys, values):
             r[keys[i]] = ''
     return r
 
-def print_fields(cursor, note_id, model_id, fieldsstr, _json):
-    fields = create_fields_dict(cursor, model_id, fieldsstr)
+def print_fields(conn, note_id, model_id, fieldsstr, _json):
+    fields = create_fields_dict(conn, model_id, fieldsstr)
     # printing results
     if not _json:
         print('# Note {} #'.format(note_id), file=sys.stderr)
@@ -212,30 +208,30 @@ def print_fields(cursor, note_id, model_id, fieldsstr, _json):
     else:
         return ordered_dict_to_lists(fields)
 
-def print_notes_fields(cursor, ids, _json=False):
+def print_notes_fields(conn, ids, _json=False):
     cards = dict()
     success = False
     if not ids:
         ids = sys.stdin
     for _id in ids:
         _id = _id.rstrip()
-        cursor.execute('select mid,flds from notes where id=?', (_id,))
-        row = cursor.fetchone()
+        row = conn.execute('select mid,flds from notes where id=?',
+                           (_id,)).fetchone()
         if not row:
             print('Note with id', _id, 'not found, skipping', file=sys.stderr)
         else:
             success = True
-            cards[_id] = print_fields(cursor, _id, row['mid'], row['flds'],
+            cards[_id] = print_fields(conn, _id, row['mid'], row['flds'],
                                       _json=_json)
                 
     if _json:
         print(json.dumps(cards))
     return success
 
-def dump_notes_fields(cursor, ids):
-    print_notes_fields(cursor, ids, _json=True)
+def dump_notes_fields(conn, ids):
+    print_notes_fields(conn, ids, _json=True)
 
-def replace_fields(cursor, json_strings):
+def replace_fields(conn, json_strings):
     success = False
     for string in json_strings:
         cards = json.loads(string)
@@ -248,20 +244,19 @@ def replace_fields(cursor, json_strings):
                 print('Malformed string, aborting:', string, file=sys.stderr)
                 return False
             fieldsstr = '\x1f'.join(card[1])
-            cursor.execute('update notes set flds=?,mod=?,usn=? where id=?',
+            conn.execute('update notes set flds=?,mod=?,usn=? where id=?',
                            (fieldsstr, int(time.time()), -1, _id))
             success = True
     return success
 
-def list_models_decks(cursor, regexs, keyword):
+def list_models_decks(conn, regexs, keyword):
     if keyword not in ['models', 'decks']:
         raise ValueError('Keyword should be either models or decks: '+keyword)
 
     if not regexs:
         regexs.append('.')
 
-    cursor.execute("select {} from col where id=1".format(keyword))
-    row = cursor.fetchone()
+    row = conn.execute("select "+keyword+" from col where id=1").fetchone()
     if not row:
         print("Couldn't read collection.")
         return False
@@ -293,11 +288,11 @@ def list_models_decks(cursor, regexs, keyword):
             print(key)
     return True
 
-def list_models(cursor, regexs):
-    return list_models_decks(cursor, regexs, 'models')
+def list_models(conn, regexs):
+    return list_models_decks(conn, regexs, 'models')
 
-def list_decks(cursor, regexs):
-    return list_models_decks(cursor, regexs, 'decks')
+def list_decks(conn, regexs):
+    return list_models_decks(conn, regexs, 'decks')
 
 def run():
     # command line command -> handler function
@@ -331,10 +326,9 @@ def run():
     # connecting to the database
     connection = sqlite3.connect(collection)
     connection.row_factory = sqlite3.Row
-    cursor = connection.cursor()
 
     # executing and committing transactions
-    success = commands[command](cursor, args)
+    success = commands[command](connection, args)
     if success and connection.in_transaction:
         print("\nWARNING: this software is alpha. Backup your collection "
               "before committing any changes. Check that everything went as "
@@ -354,7 +348,6 @@ def run():
             success = False
 
     # cleaning up
-    cursor.close()
     connection.close()
     if success:
         exit(0)
