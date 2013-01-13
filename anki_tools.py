@@ -232,7 +232,7 @@ def dump_notes_fields(conn, ids):
     print_notes_fields(conn, ids, _json=True)
 
 def replace_fields(conn, json_strings):
-    success = False
+    total = 0
     for string in json_strings:
         notes = json.loads(string)
         if type(notes) != dict:
@@ -246,8 +246,12 @@ def replace_fields(conn, json_strings):
             fieldsstr = '\x1f'.join(note[1])
             conn.execute('update notes set flds=?,mod=?,usn=? where id=?',
                            (fieldsstr, int(time.time()), -1, _id))
-            success = True
-    return success
+            total += 1
+    if total > 0:
+        print(total, 'notes successfully modified')
+    else:
+        print('No notes were modified', file=sys.stderr)
+    return (total > 0)
 
 def list_models_decks(conn, regexs, keyword):
     if keyword not in ['models', 'decks']:
@@ -326,7 +330,7 @@ def dump_notes_tags(conn, ids):
     print_notes_tags(conn, ids, _json=True)
 
 def replace_tags(conn, json_strings):
-    success = False
+    total = 0
     for string in json_strings:
         notes = json.loads(string)
         if type(notes) != dict:
@@ -340,8 +344,12 @@ def replace_tags(conn, json_strings):
                 tagsstr = ' {} '.format(' '.join(tags))
             conn.execute('update notes set tags=?,mod=?,usn=? where id=?',
                            (tagsstr, int(time.time()), -1, _id))
-            success = True
-    return success
+            total += 1
+    if total > 0:
+        print(total, 'notes successfully modified')
+    else:
+        print('No notes were modified', file=sys.stderr)
+    return (total > 0)
 
 def run():
     # command line command -> handler function
