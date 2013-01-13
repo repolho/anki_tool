@@ -209,7 +209,7 @@ def print_fields(conn, note_id, model_id, fieldsstr, _json):
         return ordered_dict_to_lists(fields)
 
 def print_notes_fields(conn, ids, _json=False):
-    cards = dict()
+    notes = dict()
     success = False
     if not ids:
         ids = sys.stdin
@@ -221,11 +221,11 @@ def print_notes_fields(conn, ids, _json=False):
             print('Note with id', _id, 'not found, skipping', file=sys.stderr)
         else:
             success = True
-            cards[_id] = print_fields(conn, _id, row['mid'], row['flds'],
+            notes[_id] = print_fields(conn, _id, row['mid'], row['flds'],
                                       _json=_json)
                 
     if _json:
-        print(json.dumps(cards))
+        print(json.dumps(notes))
     return success
 
 def dump_notes_fields(conn, ids):
@@ -234,16 +234,16 @@ def dump_notes_fields(conn, ids):
 def replace_fields(conn, json_strings):
     success = False
     for string in json_strings:
-        cards = json.loads(string)
-        if type(cards) != dict:
+        notes = json.loads(string)
+        if type(notes) != dict:
             print('Malformed string, aborting:', string, file=sys.stderr)
             return False
-        for _id in cards:
-            card = cards[_id]
-            if len(card) != 2 or type(card[0]) != list or type(card[1]) != list:
+        for _id in notes:
+            note = notes[_id]
+            if len(note) != 2 or type(note[0]) != list or type(note[1]) != list:
                 print('Malformed string, aborting:', string, file=sys.stderr)
                 return False
-            fieldsstr = '\x1f'.join(card[1])
+            fieldsstr = '\x1f'.join(note[1])
             conn.execute('update notes set flds=?,mod=?,usn=? where id=?',
                            (fieldsstr, int(time.time()), -1, _id))
             success = True
@@ -294,6 +294,55 @@ def list_models(conn, regexs):
 def list_decks(conn, regexs):
     return list_models_decks(conn, regexs, 'decks')
 
+def print_tags(conn, note_id, tagsstr):
+    # printing results
+    print('# Note {} #'.format(note_id), file=sys.stderr)
+    print(tagsstr.strip())
+    print()
+
+def print_notes_tags(conn, ids, _json=False):
+    notes = dict()
+    success = False
+    if not ids:
+        ids = sys.stdin
+    for _id in ids:
+        _id = _id.rstrip()
+        row = conn.execute('select tags from notes where id=?',
+                           (_id,)).fetchone()
+        if not row:
+            print('Note with id', _id, 'not found, skipping', file=sys.stderr)
+        else:
+            success = True
+            if _json:
+                notes[_id] = row['tags']
+            else:
+                print_tags(conn, _id, row['tags'])
+                
+    if _json:
+        print(json.dumps(notes))
+    return success
+
+def dump_notes_tags(conn, ids):
+    print_notes_tags(conn, ids, _json=True)
+
+def replace_tags(conn, json_strings):
+    success = False
+    for string in json_strings:
+        notes = json.loads(string)
+        if type(notes) != dict:
+            print('Malformed string, aborting:', string, file=sys.stderr)
+            return False
+        for _id in notes:
+            tags = notes[_id].strip().split(' ')
+            if not tags:
+                tagsstr = ''
+            else:
+                tagsstr = ' {} '.format(' '.join(tags))
+            conn.execute('update notes set tags=?,mod=?,usn=? where id=?',
+                           (tagsstr, int(time.time()), -1, _id))
+            success = True
+    return success
+
 def run():
     # command line command -> handler function
     commands = {
@@ -304,7 +353,10 @@ def run():
         'dump_fields': dump_notes_fields,
         'replace_fields': replace_fields,
         'list_models': list_models,
-        'list_decks': list_decks
+        'list_decks': list_decks,
+        'print_tags': print_notes_tags,
+        'dump_tags': dump_notes_tags,
+        'replace_tags': replace_tags,
         }
 
     # handling errors in command line
@@ -314,8 +366,8 @@ def run():
         if len(sys.argv) >= 3 and sys.argv[2] not in commands.keys():
             print("Unknown command:", sys.argv[2], file=sys.stderr)
         print("Usage: {} anki_collection_file command arguments\n"
-              "Available commands: {}".format(sys.argv[0],
-                                              " ".join(commands.keys())),
+              "Available commands:\n{}".format(sys.argv[0],
+                                              "\n".join(commands.keys())),
               file=sys.stderr)
         exit(1)
 
