@@ -9,8 +9,8 @@ import json
 import time
 import collections
 
-def rename_tag_in_cards(conn, tag, dst):
-    """Renames a single tag in all cards"""
+def rename_tag_in_notes(conn, tag, dst):
+    """Renames a single tag in all notes"""
     n = 0
     found = []
     for row in conn.execute("select * from notes where tags like ?",
@@ -43,9 +43,9 @@ def rename_tag_in_cards(conn, tag, dst):
         else:
             verb = 'removed'
         print('Tag ‘'+tag+'’ successfully', verb, 'in',
-               n, 'cards.', file=sys.stderr)
+               n, 'notes.', file=sys.stderr)
     else:
-        print('Tag ‘'+tag+'’ not found in any cards.', file=sys.stderr)
+        print('Tag ‘'+tag+'’ not found in any notes.', file=sys.stderr)
 
 def rename_tags(conn, tags, remove=False):
     """Renames or removes all tags matching regular expressions"""
@@ -92,14 +92,14 @@ def rename_tags(conn, tags, remove=False):
                     tagsdict[dst] = -1
 
                 try:
-                    rename_tag_in_cards(conn, tag, dst)
+                    rename_tag_in_notes(conn, tag, dst)
                 except sqlite3.OperationalError:
                     return False
         if not found:
-            print("Couldn't find tags matching ‘{}’, searching cards for exact "
+            print("Couldn't find tags matching ‘{}’, searching notes for exact "
                   "string.".format(target), file=sys.stderr)
             try:
-                rename_tag_in_cards(conn, target, dst)
+                rename_tag_in_notes(conn, target, dst)
             except sqlite3.OperationalError:
                 return False
 
@@ -122,7 +122,7 @@ def rename_tags(conn, tags, remove=False):
 def remove_tags(conn, tags):
     return rename_tags(conn, tags, remove=True)
 
-def search_cards(conn, regexps):
+def search_notes(conn, regexps):
     if not regexps:
         regexps = []
         for regex in sys.stdin:
@@ -356,7 +356,7 @@ def run():
     commands = {
         'rm_tags': remove_tags,
         'mv_tags': rename_tags,
-        'search': search_cards,
+        'search': search_notes,
         'print_fields': print_notes_fields,
         'dump_fields': dump_notes_fields,
         'replace_fields': replace_fields,
