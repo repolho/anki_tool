@@ -131,6 +131,8 @@ def search_notes(conn, regexps):
     success = False
     for row in conn.execute('select id,mid,flds,tags,sfld from notes'):
         tags = row['tags'].split()
+        if not tags:
+            tags = [''] # so ^$ will match
         ids = [str(row['id']), str(row['mid'])]
         groups = []
         for regex in regexps:
