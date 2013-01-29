@@ -130,6 +130,8 @@ def search_notes(conn, regexps):
 
     success = False
     for row in conn.execute('select id,mid,flds,tags,sfld from notes'):
+        # removing html tags
+        flds = re.sub('<[^>]*>', '', row['flds']).split('\x1f')
         tags = row['tags'].split()
         if not tags:
             tags = [''] # so ^$ will match
@@ -138,7 +140,7 @@ def search_notes(conn, regexps):
         for regex in regexps:
             found = False
             # searching fields, tags and ids for pattern
-            for string in tags+ids+[row['flds']]:
+            for string in tags+ids+flds:
                 r = re.search(regex, string, re.I)
                 if r:
                     groups.append(r.group())
