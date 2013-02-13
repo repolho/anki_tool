@@ -498,5 +498,5 @@ def run():
 # Only run if being executed directly, so other scripts can source this one and
 # call its functions. Note that, in this case, the caller is responsible for
 # opening and closing the database and commiting any changes.
-if os.path.splitext(os.path.basename(sys.argv[0]))[0] == 'anki_tools':
+if os.path.splitext(os.path.basename(sys.argv[0]))[0] == 'anki_tool':
     run()
