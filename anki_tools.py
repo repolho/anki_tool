@@ -124,7 +124,7 @@ def rename_tags(conn, tags, remove=False):
 def remove_tags(conn, tags):
     return rename_tags(conn, tags, remove=True)
 
-def search_notes(conn, regexps):
+def search_notes(conn, regexps, only_field=None, only_tags=False):
     if not regexps:
         regexps = []
         print('Reading from stdin...', file=sys.stderr)
@@ -133,17 +133,32 @@ def search_notes(conn, regexps):
 
     success = False
     for row in conn.execute('select id,mid,flds,tags,sfld from notes'):
-        # removing html tags
-        flds = re.sub('<[^>]*>', '', row['flds']).split('\x1f')
         tags = row['tags'].split()
         if not tags:
             tags = [''] # so ^$ will match
-        ids = [str(row['id']), str(row['mid'])]
+
+        # choosing targets to search in
+        if only_tags:
+            targets = tags
+        elif only_field:
+            fields = create_fields_dict(conn, row['mid'], row['flds'])
+            targets = []
+            # choosing only fields matching the desired pattern
+            for key in fields.keys():
+                if re.search(only_field, key, re.I):
+                    targets.append(fields[key])
+        else:
+            # removing html tags
+            flds = re.sub('<[^>]*>', '', row['flds']).split('\x1f')
+            ids = [str(row['id']), str(row['mid'])]
+            targets = tags+ids+flds
+
+        # searching
         groups = []
         for regex in regexps:
             found = False
             # searching fields, tags and ids for pattern
-            for string in tags+ids+flds:
+            for string in targets:
                 r = re.search(regex, string, re.I)
                 if r:
                     groups.append(r.group())
@@ -159,6 +174,19 @@ def search_notes(conn, regexps):
             print(row['id'])
             success = True
     return success
+
+def search_notes_field(conn, regexps):
+    if not regexps:
+        print('Usage: search_field field_regex regex [regex]...',
+              file=sys.stderr)
+        return False
+
+    field_regex = regexps[0]
+    regexps = regexps[1:]
+    return search_notes(conn, regexps, only_field=field_regex)
+
+def search_notes_tags(conn, regexps):
+    return search_notes(conn, regexps, only_tags=True)
 
 models = None
 def read_models(conn):
@@ -397,17 +425,19 @@ def prompt_confirmation():
 def run():
     # command line command -> handler function
     commands = {
-        'rm_tags': remove_tags,
-        'mv_tags': rename_tags,
-        'search': search_notes,
-        'print_fields': print_notes_fields,
         'dump_fields': dump_notes_fields,
-        'replace_fields': replace_fields,
-        'list_models': list_models,
-        'list_decks': list_decks,
-        'print_tags': print_notes_tags,
         'dump_tags': dump_notes_tags,
+        'list_decks': list_decks,
+        'list_models': list_models,
+        'mv_tags': rename_tags,
+        'print_fields': print_notes_fields,
+        'print_tags': print_notes_tags,
+        'replace_fields': replace_fields,
         'replace_tags': replace_tags,
+        'rm_tags': remove_tags,
+        'search': search_notes,
+        'search_field': search_notes_field,
+        'search_tags': search_notes_tags
         }
 
     # parsing command line
