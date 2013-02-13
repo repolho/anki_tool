@@ -57,6 +57,7 @@ def rename_tags(conn, tags, remove=False):
         return False
     elif remove and not tags:
         tags = []
+        print('Reading from stdin...', file=sys.stderr)
         for tag in sys.stdin:
             tags.append(tag.rstrip())
 
@@ -126,6 +127,7 @@ def remove_tags(conn, tags):
 def search_notes(conn, regexps):
     if not regexps:
         regexps = []
+        print('Reading from stdin...', file=sys.stderr)
         for regex in sys.stdin:
             regexps.append(regex.rstrip())
 
@@ -217,6 +219,7 @@ def print_notes_fields(conn, ids, _json=False):
     notes = dict()
     success = False
     if not ids:
+        print('Reading from stdin...', file=sys.stderr)
         ids = sys.stdin
     for _id in ids:
         _id = _id.rstrip()
@@ -238,8 +241,11 @@ def dump_notes_fields(conn, ids):
 
 def replace_fields(conn, json_strings):
     total = 0
+    if not json_strings:
+        print('Reading from stdin...', file=sys.stderr)
+        json_strings= sys.stdin
     for string in json_strings:
-        notes = json.loads(string)
+        notes = json.loads(string.rstrip())
         if type(notes) != dict:
             print('Malformed string, aborting:', string, file=sys.stderr)
             return False
@@ -263,6 +269,7 @@ def list_models_decks(conn, regexs, keyword):
         raise ValueError('Keyword should be either models or decks: '+keyword)
 
     if not regexs:
+        print('Listing all ', keyword, '.', sep='', file=sys.stderr)
         regexs.append('.')
 
     row = conn.execute("select "+keyword+" from col where id=1").fetchone()
@@ -313,6 +320,7 @@ def print_notes_tags(conn, ids, _json=False):
     notes = dict()
     success = False
     if not ids:
+        print('Reading from stdin...', file=sys.stderr)
         ids = sys.stdin
     for _id in ids:
         _id = _id.rstrip()
@@ -336,8 +344,11 @@ def dump_notes_tags(conn, ids):
 
 def replace_tags(conn, json_strings):
     total = 0
+    if not json_strings:
+        print('Reading from stdin...', file=sys.stderr)
+        json_strings= sys.stdin
     for string in json_strings:
-        notes = json.loads(string)
+        notes = json.loads(string.rstrip())
         if type(notes) != dict:
             print('Malformed string, aborting:', string, file=sys.stderr)
             return False
@@ -430,7 +441,10 @@ def run():
     connection.row_factory = sqlite3.Row
 
     # executing
-    success = commands[opts.command](connection, opts.arguments)
+    try:
+        success = commands[opts.command](connection, opts.arguments)
+    except KeyboardInterrupt:
+        success = False
 
     # committing transactions
     if success and connection.in_transaction:
