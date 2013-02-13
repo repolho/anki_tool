@@ -1,10 +1,9 @@
-migrate options to argparse
-try to open deck from ./collection.anki2 and ~/Anki/User\ 1/collection.anki2 (and ~/.anki/User\ 1/collection.anki2) by default
-add switch to force committing (especially for when reading from stdin)
-
 add add_cards
 
 add dump_cards, replace_cards
 include at least note's contents (reversed if ord==1 (or just print "forward"
 and "reverse"?)), tags, difficulty, scheduled date
 search by note id (but in table cards)
+
+add split_note
+create new note for reverse, but mantain card; for forward, only change model id

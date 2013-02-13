@@ -8,6 +8,7 @@ import re
 import json
 import time
 import collections
+import argparse
 
 def rename_tag_in_notes(conn, tag, dst):
     """Renames a single tag in all notes"""
@@ -355,6 +356,32 @@ def replace_tags(conn, json_strings):
         print('No notes were modified', file=sys.stderr)
     return (total > 0)
 
+def find_collection():
+    default_locations = [
+                         os.environ['HOME']+'/Anki/User 1/collection.anki2',
+                         os.environ['HOME']+'/.anki/User 1/collection.anki2',
+                         'collection.anki2'
+                        ]
+    for location in default_locations:
+        if os.path.exists(location):
+            return location
+    return None
+
+def prompt_confirmation():
+    print("\nWARNING: this software is alpha. Backup your collection "
+          "before committing any changes. Check that everything went as "
+          "expected before modifying the deck in anki (including reviewing "
+          "cards), at the risk of having to restore your backup later and "
+          "losing your changes.\n",
+          file=sys.stderr)
+    try:
+        answer = input('Commit changes (y/N)? ')
+    except (EOFError, KeyboardInterrupt):
+        answer = None
+    if answer == 'y' or answer == 'Y':
+        return True
+    return False
+
 def run():
     # command line command -> handler function
     commands = {
@@ -371,40 +398,43 @@ def run():
         'replace_tags': replace_tags,
         }
 
-    # handling errors in command line
-    if len(sys.argv) < 3 or not os.path.exists(sys.argv[1]) or sys.argv[2] not in commands.keys():
-        if len(sys.argv) >= 2 and not os.path.exists(sys.argv[1]):
-            print("File not found:", sys.argv[1], file=sys.stderr)
-        if len(sys.argv) >= 3 and sys.argv[2] not in commands.keys():
-            print("Unknown command:", sys.argv[2], file=sys.stderr)
-        print("Usage: {} anki_collection_file command arguments\n"
-              "Available commands:\n{}".format(sys.argv[0],
-                                              "\n".join(commands.keys())),
-              file=sys.stderr)
-        exit(1)
+    # parsing command line
+    parser = argparse.ArgumentParser(description='Low level manipulation of '
+                                                 'anki collections')
+    parser.add_argument('-f', '--force', dest='force', action='store_true',
+                        help='force committing changes to database')
+    parser.add_argument('-c', '--collection', dest='db',
+                        metavar='collection_db',
+                        help='collection database file')
+    parser.add_argument('command', choices=commands.keys(),
+                        help='command to execute')
+    parser.add_argument('arguments', nargs='*',
+                        help='arguments for the command')
+    opts = parser.parse_args()
 
-    collection = sys.argv[1]
-    command = sys.argv[2]
-    args = sys.argv[3:]
+    if opts.db:
+        collection = opts.db
+        if not os.path.exists(collection):
+            print("Error: couldn't find collection at ‘", collection, '’.',
+                  sep='', file=sys.stderr)
+            exit(1)
+    else:
+        collection = find_collection()
+        if not collection:
+            print("Error: couldn't find collection. Try especifying its", 
+                  "location with -c.", file=sys.stderr)
+            exit(1)
 
     # connecting to the database
     connection = sqlite3.connect(collection)
     connection.row_factory = sqlite3.Row
 
-    # executing and committing transactions
-    success = commands[command](connection, args)
+    # executing
+    success = commands[opts.command](connection, opts.arguments)
+
+    # committing transactions
     if success and connection.in_transaction:
-        print("\nWARNING: this software is alpha. Backup your collection "
-              "before committing any changes. Check that everything went as "
-              "expected before modifying the deck in anki (including reviewing "
-              "cards), at the risk of having to restore your backup later and "
-              "losing your changes.\n",
-              file=sys.stderr)
-        try:
-            answer = input('Commit changes (y/N)? ')
-        except (EOFError, KeyboardInterrupt):
-            answer = None
-        if answer == 'y' or answer == 'Y':
+        if opts.force or prompt_confirmation():
             connection.commit()
         else:
             print('\nCanceling changes, your deck was not modified.',
