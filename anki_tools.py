@@ -448,7 +448,7 @@ def run():
     parser.add_argument('-c', '--collection', dest='db',
                         metavar='collection_db',
                         help='collection database file')
-    parser.add_argument('command', choices=commands.keys(),
+    parser.add_argument('command', choices=sorted(commands.keys()),
                         help='command to execute')
     parser.add_argument('arguments', nargs='*',
                         help='arguments for the command')
