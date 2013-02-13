@@ -38,15 +38,16 @@ def rename_tag_in_notes(conn, tag, dst):
                        (tagstr, int(time.time()), -1, row['id']))
         n += 1
 
-    if n > 0:
-        if dst:
-            verb = 'renamed'
+    if not quiet:
+        if n > 0:
+            if dst:
+                verb = 'renamed'
+            else:
+                verb = 'removed'
+                print('Tag ‘'+tag+'’ successfully', verb, 'in',
+                       n, 'notes.', file=sys.stderr)
         else:
-            verb = 'removed'
-        print('Tag ‘'+tag+'’ successfully', verb, 'in',
-               n, 'notes.', file=sys.stderr)
-    else:
-        print('Tag ‘'+tag+'’ not found in any notes.', file=sys.stderr)
+            print('Tag ‘'+tag+'’ not found in any notes.', file=sys.stderr)
 
 def rename_tags(conn, tags, remove=False):
     """Renames or removes all tags matching regular expressions"""
@@ -57,7 +58,8 @@ def rename_tags(conn, tags, remove=False):
         return False
     elif remove and not tags:
         tags = []
-        print('Reading from stdin...', file=sys.stderr)
+        if not quiet:
+            print('Reading from stdin...', file=sys.stderr)
         for tag in sys.stdin:
             tags.append(tag.rstrip())
 
@@ -98,8 +100,9 @@ def rename_tags(conn, tags, remove=False):
                 except sqlite3.OperationalError:
                     return False
         if not found:
-            print("Couldn't find tags matching ‘{}’, searching notes for exact "
-                  "string.".format(target), file=sys.stderr)
+            if not quiet:
+                print("Couldn't find tags matching ‘{}’, searching notes",
+                      "for exact string.".format(target), file=sys.stderr)
             try:
                 rename_tag_in_notes(conn, target, dst)
             except sqlite3.OperationalError:
@@ -114,9 +117,10 @@ def rename_tags(conn, tags, remove=False):
     else:
         verb = 'removed'
     if n == 0:
-        print('No tags were', verb, file=sys.stderr)
+        if not quiet:
+            print('No tags were', verb, file=sys.stderr)
         return False
-    else:
+    elif not quiet:
         print(n, 'tag(s) successfully', verb, file=sys.stderr)
 
     return True
@@ -127,7 +131,8 @@ def remove_tags(conn, tags):
 def search_notes(conn, regexps, only_field=None, only_tags=False):
     if not regexps:
         regexps = []
-        print('Reading from stdin...', file=sys.stderr)
+        if not quiet:
+            print('Reading from stdin...', file=sys.stderr)
         for regex in sys.stdin:
             regexps.append(regex.rstrip())
 
@@ -169,8 +174,9 @@ def search_notes(conn, regexps, only_field=None, only_tags=False):
         # found will only be true if all patterns matched something
         if found:
             # printing only the id to stdout, so output can be piped somewhere
-            print('Found ', ' and '.join(groups), ' in card ‘', row['sfld'],
-                  '’, id:', sep='', file=sys.stderr)
+            if not quiet:
+                print('Found ', ' and '.join(groups), ' in card ‘',
+                      row['sfld'], '’, id:', sep='', file=sys.stderr)
             print(row['id'])
             success = True
     return success
@@ -235,9 +241,11 @@ def print_fields(conn, note_id, model_id, fieldsstr, _json):
     fields = create_fields_dict(conn, model_id, fieldsstr)
     # printing results
     if not _json:
-        print('# Note {} #'.format(note_id), file=sys.stderr)
+        if not quiet:
+            print('# Note {} #'.format(note_id), file=sys.stderr)
         for name in fields:
-            print('## {} ##'.format(name), file=sys.stderr)
+            if not quiet:
+                print('## {} ##'.format(name), file=sys.stderr)
             print(fields[name])
         print()
         return None
@@ -248,14 +256,17 @@ def print_notes_fields(conn, ids, _json=False):
     notes = dict()
     success = False
     if not ids:
-        print('Reading from stdin...', file=sys.stderr)
+        if not quiet:
+            print('Reading from stdin...', file=sys.stderr)
         ids = sys.stdin
     for _id in ids:
         _id = _id.rstrip()
         row = conn.execute('select mid,flds from notes where id=?',
                            (_id,)).fetchone()
         if not row:
-            print('Note with id', _id, 'not found, skipping', file=sys.stderr)
+            if not quiet:
+                print('Note with id', _id, 'not found, skipping',
+                      file=sys.stderr)
         else:
             success = True
             notes[_id] = print_fields(conn, _id, row['mid'], row['flds'],
@@ -271,7 +282,8 @@ def dump_notes_fields(conn, ids):
 def replace_fields(conn, json_strings):
     total = 0
     if not json_strings:
-        print('Reading from stdin...', file=sys.stderr)
+        if not quiet:
+            print('Reading from stdin...', file=sys.stderr)
         json_strings= sys.stdin
     for string in json_strings:
         notes = json.loads(string.rstrip())
@@ -289,7 +301,7 @@ def replace_fields(conn, json_strings):
             total += 1
     if total > 0:
         print(total, 'notes successfully modified')
-    else:
+    elif not quiet:
         print('No notes were modified', file=sys.stderr)
     return (total > 0)
 
@@ -298,7 +310,8 @@ def list_models_decks(conn, regexs, keyword):
         raise ValueError('Keyword should be either models or decks: '+keyword)
 
     if not regexs:
-        print('Listing all ', keyword, '.', sep='', file=sys.stderr)
+        if not quiet:
+            print('Listing all ', keyword, '.', sep='', file=sys.stderr)
         regexs = ['.']
 
     row = conn.execute("select "+keyword+" from col where id=1").fetchone()
@@ -329,7 +342,8 @@ def list_models_decks(conn, regexs, keyword):
                 matches = False
                 break
         if matches:
-            print('# {} #'.format(dic[key]['name']), file=sys.stderr)
+            if not quiet:
+                print('# {} #'.format(dic[key]['name']), file=sys.stderr)
             print(key)
     return True
 
@@ -341,7 +355,8 @@ def list_decks(conn, regexs):
 
 def print_tags(conn, note_id, tagsstr):
     # printing results
-    print('# Note {} #'.format(note_id), file=sys.stderr)
+    if not quiet:
+        print('# Note {} #'.format(note_id), file=sys.stderr)
     print(tagsstr.strip())
     print()
 
@@ -349,14 +364,17 @@ def print_notes_tags(conn, ids, _json=False):
     notes = dict()
     success = False
     if not ids:
-        print('Reading from stdin...', file=sys.stderr)
+        if not quiet:
+            print('Reading from stdin...', file=sys.stderr)
         ids = sys.stdin
     for _id in ids:
         _id = _id.rstrip()
         row = conn.execute('select tags from notes where id=?',
                            (_id,)).fetchone()
         if not row:
-            print('Note with id', _id, 'not found, skipping', file=sys.stderr)
+            if not quiet:
+                print('Note with id', _id, 'not found, skipping',
+                      file=sys.stderr)
         else:
             success = True
             if _json:
@@ -374,7 +392,8 @@ def dump_notes_tags(conn, ids):
 def replace_tags(conn, json_strings):
     total = 0
     if not json_strings:
-        print('Reading from stdin...', file=sys.stderr)
+        if not quiet:
+            print('Reading from stdin...', file=sys.stderr)
         json_strings= sys.stdin
     for string in json_strings:
         notes = json.loads(string.rstrip())
@@ -392,7 +411,7 @@ def replace_tags(conn, json_strings):
             total += 1
     if total > 0:
         print(total, 'notes successfully modified')
-    else:
+    elif not quiet:
         print('No notes were modified', file=sys.stderr)
     return (total > 0)
 
@@ -408,6 +427,8 @@ def find_collection():
     return None
 
 def prompt_confirmation():
+    if quiet:
+        return False
     print("\nWARNING: this software is alpha. Backup your collection "
           "before committing any changes. Check that everything went as "
           "expected before modifying the deck in anki (including reviewing "
@@ -423,7 +444,10 @@ def prompt_confirmation():
         return True
     return False
 
+quiet = False
 def run():
+    global quiet
+
     # command line command -> handler function
     commands = {
         'dump_fields': dump_notes_fields,
@@ -446,6 +470,9 @@ def run():
                                                  'anki collections')
     parser.add_argument('-f', '--force', dest='force', action='store_true',
                         help='force committing changes to database')
+    parser.add_argument('-q', '--quiet', dest='quiet', action='store_true',
+                        help="don't print helpful messages to stderr (error "
+                             "messages are still printed)")
     parser.add_argument('-c', '--collection', dest='db',
                         metavar='collection_db',
                         help='collection database file')
@@ -454,6 +481,9 @@ def run():
     parser.add_argument('arguments', nargs='*',
                         help='arguments for the command')
     opts = parser.parse_args()
+
+    if opts.quiet:
+        quiet = True
 
     if opts.db:
         collection = opts.db
@@ -483,8 +513,8 @@ def run():
         if opts.force or prompt_confirmation():
             connection.commit()
         else:
-            print('\nCanceling changes, your collection was not modified.',
-                  '(If piping to stdin, use the -f switch to force '
+            print('\nCanceling changes. Your collection was not modified.',
+                  '(If piping to stdin or using -q, use the -f switch to force '
                   'committing.)',
                   sep='\n', file=sys.stderr)
             success = False
