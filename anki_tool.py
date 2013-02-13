@@ -199,6 +199,7 @@ def read_models(conn):
             models = json.loads(row['models'])
 
 def create_fields_dict(conn, model_id, fieldsstr):
+    global models
     if not models:
         read_models(conn)
     # creating fields dict
@@ -298,7 +299,7 @@ def list_models_decks(conn, regexs, keyword):
 
     if not regexs:
         print('Listing all ', keyword, '.', sep='', file=sys.stderr)
-        regexs.append('.')
+        regexs = ['.']
 
     row = conn.execute("select "+keyword+" from col where id=1").fetchone()
     if not row:
