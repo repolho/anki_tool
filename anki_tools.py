@@ -383,12 +383,13 @@ def prompt_confirmation():
           "before committing any changes. Check that everything went as "
           "expected before modifying the deck in anki (including reviewing "
           "cards), at the risk of having to restore your backup later and "
-          "losing your changes.\n",
+          "losing your work.\n",
           file=sys.stderr)
     try:
         answer = input('Commit changes (y/N)? ')
     except (EOFError, KeyboardInterrupt):
         answer = None
+        print(file=sys.stderr)
     if answer == 'y' or answer == 'Y':
         return True
     return False
@@ -451,8 +452,10 @@ def run():
         if opts.force or prompt_confirmation():
             connection.commit()
         else:
-            print('\nCanceling changes, your deck was not modified.',
-                  file=sys.stderr)
+            print('\nCanceling changes, your collection was not modified.',
+                  '(If piping to stdin, use the -f switch to force '
+                  'committing.)',
+                  sep='\n', file=sys.stderr)
             success = False
 
     # cleaning up
