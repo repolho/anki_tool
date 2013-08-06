@@ -174,10 +174,14 @@ def search_notes(conn, regexps, only_field=None, only_tags=False):
         # found will only be true if all patterns matched something
         if found:
             # printing only the id to stdout, so output can be piped somewhere
-            if not quiet:
-                print('Found ', ' and '.join(groups), ' in card ‘',
-                      row['sfld'], '’, id:', sep='', file=sys.stderr)
-            print(row['id'])
+            if not human_readable:
+                if not quiet:
+                    print('Found ', ' and '.join(groups), ' in card ‘',
+                          row['sfld'], '’, id:', sep='', file=sys.stderr)
+
+                print(row['id'])
+            else:
+                print_note(conn, row['id'], row['mid'], row['flds'], row['tags'])
             success = True
     return success
 
@@ -416,6 +420,14 @@ def replace_tags(conn, json_strings):
         print('No notes were modified', file=sys.stderr)
     return (total > 0)
 
+def print_note(conn, note_id, model_id, fields_str, tags_str):
+    if not quiet:
+        print('# Note {} #'.format(note_id), file=sys.stderr)
+    print_fields(conn, note_id, model_id, fields_str, _json=False, print_notes=True)
+    if not quiet:
+        print('## Tags ##', file=sys.stderr)
+    print_tags(conn, note_id, tags_str, print_notes=True)
+
 def print_notes(conn, ids):
     success = False
     if not ids:
@@ -432,12 +444,7 @@ def print_notes(conn, ids):
                       file=sys.stderr)
         else:
             success = True
-            if not quiet:
-                print('# Note {} #'.format(_id), file=sys.stderr)
-            print_fields(conn, _id, row['mid'], row['flds'], _json=False, print_notes=True)
-            if not quiet:
-                print('## Tags ##', file=sys.stderr)
-            print_tags(conn, _id, row['tags'], print_notes=True)
+            print_note(conn, _id, row['mid'], row['flds'], row['tags'])
     return success
 
 def find_collection():
@@ -470,8 +477,10 @@ def prompt_confirmation():
     return False
 
 quiet = False
+human_readable = False
 def run():
     global quiet
+    global human_readable
 
     # command line command -> handler function
     commands = {
@@ -499,6 +508,10 @@ def run():
     parser.add_argument('-q', '--quiet', dest='quiet', action='store_true',
                         help="don't print helpful messages to stderr (error "
                              "messages are still printed)")
+    parser.add_argument('-r', '--human-readable', dest='human_readable',
+                        action='store_true', help="search functions will print "
+                        "human readable output (equivalent to piping to the "
+                        "appropriate print_* funcition)")
     parser.add_argument('-c', '--collection', dest='db',
                         metavar='collection_db',
                         help='collection database file')
@@ -510,6 +523,9 @@ def run():
 
     if opts.quiet:
         quiet = True
+
+    if opts.human_readable:
+        human_readable = True
 
     if opts.db:
         collection = opts.db
