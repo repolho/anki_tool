@@ -195,6 +195,14 @@ def search_notes_field(conn, regexps):
     regexps = regexps[1:]
     return search_notes(conn, regexps, only_field=field_regex)
 
+def search_notes_fields(conn, regexps):
+    if not regexps:
+        print('Usage: search_fields_only regex [regex]...',
+              file=sys.stderr)
+        return False
+
+    return search_notes(conn, regexps, only_field='.')
+
 def search_notes_tags(conn, regexps):
     return search_notes(conn, regexps, only_tags=True)
 
@@ -501,6 +509,7 @@ def run():
         'rm_tags': remove_tags,
         'search': search_notes,
         'search_field': search_notes_field,
+        'search_fields_only': search_notes_fields,
         'search_tags': search_notes_tags
         }
 

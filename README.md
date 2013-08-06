@@ -35,6 +35,22 @@ For example, to search for all notes containing the word "car" in the fields nam
 
     $ anki_tool search_field '^(Front|Back)$' '\bcar\b'
 
+### search_fields_only ###
+
+    Usage: anki_tool search_fields_only regex [regex]...
+
+Search all fields, but not tags and ids, for one or more patterns and print the note ids of matching notes to stdout. The search patterns can be provided through stdin, but not the field pattern, which must be provided in the command line. This command is equivalent to using search_field and a field regex that will match every field.
+
+This command's output can be piped into any command expecting note ids, namely print_fields, print_tags, dump_fields and dump_tags.
+
+For example, to search for all notes containing the word "color" in a field, but not in a tag, you can use:
+
+    $ anki_tool search_fields_only '\bcolor\b'
+
+note that this is equivalent to:
+
+    $ anki_tool search_field '.' '\bcolor\b'
+
 ### search_tags ###
 
     Usage: anki_tool search_tags regex [regex]...
