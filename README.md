@@ -136,3 +136,15 @@ For example, to replace the tag "fish" with the tag "mammal" in all notes contai
 
     $ anki_tool -q search '\bwhale\b' | anki_tool -q dump_tags | \
         sed 's/fish/mammal/g' | anki_tool -f replace_tags
+
+### print_notes ###
+
+    Usage: anki_tool print_notes note_id [note_id]...
+
+Print all fields and tags from the specified notes. The note ids may be optionally passed through stdin instead of the command line. This command is useful for visualizing the search results produced by the search, search_fields or search_tags commands.
+
+Note that any html will be stripped from the fields prior to printing. To see the fields' exact content, use dump_fields instead.
+
+For example, to print all notes containing the word "word," one might use:
+
+    $ anki_tool -q search '\bword\b' | anki_tool print_notes

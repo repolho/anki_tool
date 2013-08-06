@@ -237,17 +237,18 @@ def lists_to_ordered_dict(keys, values):
             r[keys[i]] = ''
     return r
 
-def print_fields(conn, note_id, model_id, fieldsstr, _json):
+def print_fields(conn, note_id, model_id, fieldsstr, _json, print_notes=False):
     fields = create_fields_dict(conn, model_id, fieldsstr)
     # printing results
     if not _json:
-        if not quiet:
+        if not (quiet or print_notes):
             print('# Note {} #'.format(note_id), file=sys.stderr)
         for name in fields:
             if not quiet:
                 print('## {} ##'.format(name), file=sys.stderr)
             print(fields[name])
-        print()
+        if not print_notes:
+            print()
         return None
     else:
         return ordered_dict_to_lists(fields)
@@ -353,9 +354,9 @@ def list_models(conn, regexs):
 def list_decks(conn, regexs):
     return list_models_decks(conn, regexs, 'decks')
 
-def print_tags(conn, note_id, tagsstr):
+def print_tags(conn, note_id, tagsstr, print_notes=False):
     # printing results
-    if not quiet:
+    if not (quiet or print_notes):
         print('# Note {} #'.format(note_id), file=sys.stderr)
     print(tagsstr.strip())
     print()
@@ -415,6 +416,30 @@ def replace_tags(conn, json_strings):
         print('No notes were modified', file=sys.stderr)
     return (total > 0)
 
+def print_notes(conn, ids):
+    success = False
+    if not ids:
+        if not quiet:
+            print('Reading from stdin...', file=sys.stderr)
+        ids = sys.stdin
+    for _id in ids:
+        _id = _id.rstrip()
+        row = conn.execute('select mid,flds,tags from notes where id=?',
+                           (_id,)).fetchone()
+        if not row:
+            if not quiet:
+                print('Note with id', _id, 'not found, skipping',
+                      file=sys.stderr)
+        else:
+            success = True
+            if not quiet:
+                print('# Note {} #'.format(_id), file=sys.stderr)
+            print_fields(conn, _id, row['mid'], row['flds'], _json=False, print_notes=True)
+            if not quiet:
+                print('## Tags ##', file=sys.stderr)
+            print_tags(conn, _id, row['tags'], print_notes=True)
+    return success
+
 def find_collection():
     default_locations = [
                          os.environ['HOME']+'/Anki/User 1/collection.anki2',
@@ -455,6 +480,7 @@ def run():
         'list_decks': list_decks,
         'list_models': list_models,
         'mv_tags': rename_tags,
+        'print_notes': print_notes,
         'print_fields': print_notes_fields,
         'print_tags': print_notes_tags,
         'replace_fields': replace_fields,
