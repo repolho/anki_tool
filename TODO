@@ -1,9 +1,17 @@
+add switch to search case-sensitively
+
+add way to invert matching, that is, to search for notes that do _not_ match a pattern, like grep's -v, possibly starting a pattern with a "!"?
+
 add add_cards
 
 add dump_cards, replace_cards
-include at least note's contents (reversed if ord==1 (or just print "forward"
-and "reverse"?)), tags, difficulty, scheduled date
-search by note id (but in table cards)
+  include at least note's contents (reversed if ord==1 (or just print "forward" or "reverse"?)), tags, difficulty, scheduled date; search by note id (but in table cards)
 
-add split_note
-create new note for reverse, but mantain card; for forward, only change model id
+add split_card
+  create new note for reverse, but mantain card; for forward, only change model id
+
+add dump_notes and replace_notes
+
+add print_model (or list_field_names?), so we can know which field to use with search_field
+
+add list_notes_by_model and list_notes_by_deck?
