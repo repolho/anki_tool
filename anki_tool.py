@@ -248,9 +248,13 @@ def print_fields(conn, note_id, model_id, fieldsstr, _json, print_notes=False):
         if not (quiet or print_notes):
             print('# Note {} #'.format(note_id), file=sys.stderr)
         for name in fields:
+            # Strip html, replace </div> and <br>s with line breaks, since
+            # that's how anki handles line breaks in fields
+            field = re.sub('</div>|<br[^>]*>', '\n', fields[name]).rstrip()
+            field = re.sub('<[^>]*>', '', field)
             if not quiet:
                 print('## {} ##'.format(name), file=sys.stderr)
-            print(fields[name])
+            print(field)
         if not print_notes:
             print()
         return None
