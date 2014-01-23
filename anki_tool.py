@@ -7,6 +7,7 @@ import sqlite3
 import re
 import json
 import time
+import datetime
 import collections
 import argparse
 
@@ -128,7 +129,20 @@ def rename_tags(conn, tags, remove=False):
 def remove_tags(conn, tags):
     return rename_tags(conn, tags, remove=True)
 
-def search_notes(conn, regexps, only_field=None, only_tags=False):
+def get_card_ids(conn, note_id):
+    card_ids = []
+    for row in conn.execute("select id from cards where nid = ?", (note_id,)):
+        card_ids.append(row['id'])
+    return card_ids
+
+def get_note_id(conn, card_id):
+    # id is unique
+    row = conn.execute("select nid from cards where id = ?", (card_id,)).fetchone()
+    if row:
+        return row['nid']
+    return None
+
+def search_notes(conn, regexps, only_field=None, only_tags=False, cards=False):
     if not regexps:
         regexps = []
         if not quiet:
@@ -171,17 +185,30 @@ def search_notes(conn, regexps, only_field=None, only_tags=False):
             # if one pattern failed to match, don't bother with the rest
             if not found:
                 break
+
         # found will only be true if all patterns matched something
         if found:
+            card_ids = get_card_ids(conn, row['id'])
+
             # printing only the id to stdout, so output can be piped somewhere
             if not human_readable:
                 if not quiet:
-                    print('Found ', ' and '.join(groups), ' in card ‘',
-                          row['sfld'], '’, id:', sep='', file=sys.stderr)
-
-                print(row['id'])
+                    print('Found ', ' and '.join(groups), ' in note ‘',
+                          row['sfld'], '’, ', sep='', end='', file=sys.stderr)
+                    if not cards:
+                        print('note id:', file=sys.stderr)
+                    else:
+                        print('card ids:', file=sys.stderr)
+                if not cards:
+                    print(row['id'])
+                else:
+                    for card_id in card_ids:
+                        print(card_id)
             else:
-                print_note(conn, row['id'], row['mid'], row['flds'], row['tags'])
+                if not cards:
+                    print_note(conn, row['id'], row['mid'], row['flds'], row['tags'], cards=card_ids)
+                else:
+                    print_cards(conn, card_ids)
             success = True
     return success
 
@@ -206,6 +233,9 @@ def search_notes_fields(conn, regexps):
 def search_notes_tags(conn, regexps):
     return search_notes(conn, regexps, only_tags=True)
 
+def search_cards(conn, regexps):
+    return search_notes(conn, regexps, cards=True)
+
 models = None
 def read_models(conn):
     global models
@@ -216,7 +246,21 @@ def read_models(conn):
         else:
             models = json.loads(row['models'])
 
-def create_fields_dict(conn, model_id, fieldsstr):
+collection_creation_date = None
+def get_collection_creation_date(conn):
+    global collection_creation_date
+    if not collection_creation_date:
+        row = conn.execute('select crt from col where id=1').fetchone()
+        if not row:
+            raise Error("Couldn't read collection.")
+        else:
+            try:
+                collection_creation_date = datetime.datetime.fromtimestamp(row['crt']).date()
+            except ValueError:
+                raise Error("Couldn't understand collection's creation date: {}".format(row['crt']))
+    return collection_creation_date
+
+def create_fields_dict(conn, model_id, fieldsstr, reverse=None):
     global models
     if not models:
         read_models(conn)
@@ -224,10 +268,21 @@ def create_fields_dict(conn, model_id, fieldsstr):
     fields = collections.OrderedDict()
     field_values = fieldsstr.split('\x1f')
     i = 0
-    for field in models[str(model_id)]['flds']:
-        if i < len(field_values):
+    model_fields = models[str(model_id)]['flds']
+    # reverse will be None if the note's fields should be presented as is
+    # (including 'Reverse' field), or true or false if the fields should be
+    # presented reversed or not
+    # TODO: actually get regular and reversed layouts from model and print
+    # accordingly
+    if reverse:
+        model_fields.reverse()
+        field_values.reverse()
+    for i in range(len(model_fields)):
+        field = model_fields[i]
+        if reverse != None and field['name'] == 'Reverse':
+            continue
+        if field_values and (i < len(field_values)):
             fields[field['name']] = field_values[i]
-            i += 1
         else:
             fields[field['name']] = ''
     return fields
@@ -249,12 +304,15 @@ def lists_to_ordered_dict(keys, values):
             r[keys[i]] = ''
     return r
 
-def print_fields(conn, note_id, model_id, fieldsstr, _json, print_notes=False):
-    fields = create_fields_dict(conn, model_id, fieldsstr)
+def print_fields(conn, note_id, model_id, fieldsstr, _json, print_notes=False, reverse=None):
+    fields = create_fields_dict(conn, model_id, fieldsstr, reverse=reverse)
     # printing results
     if not _json:
         if not (quiet or print_notes):
-            print('# Note {} #'.format(note_id), file=sys.stderr)
+            if not reverse:
+                print('# Note {} #'.format(note_id), file=sys.stderr)
+            else:
+                print('# Note {} (reversed) #'.format(note_id), file=sys.stderr)
         for name in fields:
             # Strip html, replace </div> and <br>s with line breaks, since
             # that's how anki handles line breaks in fields
@@ -375,7 +433,6 @@ def print_tags(conn, note_id, tagsstr, print_notes=False):
     if not (quiet or print_notes):
         print('# Note {} #'.format(note_id), file=sys.stderr)
     print(tagsstr.strip())
-    print()
 
 def print_notes_tags(conn, ids, _json=False):
     notes = dict()
@@ -432,13 +489,22 @@ def replace_tags(conn, json_strings):
         print('No notes were modified', file=sys.stderr)
     return (total > 0)
 
-def print_note(conn, note_id, model_id, fields_str, tags_str):
+def print_note(conn, note_id, model_id, fields_str, tags_str, cards=None, reverse=None):
     if not quiet:
-        print('# Note {} #'.format(note_id), file=sys.stderr)
-    print_fields(conn, note_id, model_id, fields_str, _json=False, print_notes=True)
+        if not reverse:
+            print('# Note {} #'.format(note_id), file=sys.stderr)
+        else:
+            print('# Note {} (reversed) #'.format(note_id), file=sys.stderr)
+    print_fields(conn, note_id, model_id, fields_str, _json=False, print_notes=True, reverse=reverse)
     if not quiet:
         print('## Tags ##', file=sys.stderr)
     print_tags(conn, note_id, tags_str, print_notes=True)
+    if cards:
+        if not quiet:
+            print('## Cards ##', file=sys.stderr)
+        for card_id in cards:
+            print(card_id)
+    print()
 
 def print_notes(conn, ids):
     success = False
@@ -456,7 +522,7 @@ def print_notes(conn, ids):
                       file=sys.stderr)
         else:
             success = True
-            print_note(conn, _id, row['mid'], row['flds'], row['tags'])
+            print_note(conn, _id, row['mid'], row['flds'], row['tags'], cards=get_card_ids(conn, _id))
     return success
 
 def find_collection():
@@ -488,6 +554,59 @@ def prompt_confirmation():
         return True
     return False
 
+def print_card(conn, row):
+    if not row:
+        return
+    if not quiet:
+        print('# Card {} #'.format(row['id']), file=sys.stderr)
+
+    creation = get_collection_creation_date(conn)
+    due_date = creation + datetime.timedelta(days=row['due'])
+    print('Due date: {}'.format(due_date))
+    interval = row['ivl']
+    print('Interval: {} days'.format(interval))
+    last_review = due_date - datetime.timedelta(days=interval)
+    print('Last review: {}'.format(last_review))
+
+    ease_factor = row['factor']/10
+    print('Ease factor: {}%'.format(ease_factor))
+
+    print('Reviews: {}'.format(row['reps']))
+    print('Lapses: {}'.format(row['lapses']))
+
+    reverse = (row['ord'] == 1)
+
+    # print note for that card
+    note_id = row['nid']
+    # id is unique
+    row = conn.execute("select mid,flds,tags from notes where id = ?", (note_id,)).fetchone()
+    if row:
+        print_note(conn, note_id, row['mid'], row['flds'], row['tags'], reverse=reverse)
+
+def print_cards(conn, ids, _json=False):
+    success = True
+    if not ids:
+        if not quiet:
+            print('Reading from stdin...', file=sys.stderr)
+        ids = sys.stdin
+    for _id in ids:
+        if isinstance(_id, str):
+            try:
+                _id = int(_id.strip())
+            except ValueError:
+                success = False
+                continue
+        # id is unique
+        row = conn.execute("select id,nid,ord,due,ivl,factor,reps,lapses from cards where id = ?", (_id,)).fetchone()
+        if row:
+            print_card(conn, row)
+        elif not quiet:
+            print('Card with id', _id, 'not found, skipping',
+                  file=sys.stderr)
+            success = False
+    return success
+
+
 quiet = False
 human_readable = False
 def run():
@@ -510,7 +629,9 @@ def run():
         'search': search_notes,
         'search_field': search_notes_field,
         'search_fields_only': search_notes_fields,
-        'search_tags': search_notes_tags
+        'search_tags': search_notes_tags,
+        'search_cards': search_cards,
+        'print_cards': print_cards,
         }
 
     # parsing command line
