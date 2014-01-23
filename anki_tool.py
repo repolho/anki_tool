@@ -554,34 +554,41 @@ def prompt_confirmation():
         return True
     return False
 
-def print_card(conn, row):
+def print_card(conn, row, return_dict=False):
     if not row:
         return
-    if not quiet:
-        print('# Card {} #'.format(row['id']), file=sys.stderr)
 
     creation = get_collection_creation_date(conn)
     due_date = creation + datetime.timedelta(days=row['due'])
-    print('Due date: {}'.format(due_date))
     interval = row['ivl']
-    print('Interval: {} days'.format(interval))
     last_review = due_date - datetime.timedelta(days=interval)
-    print('Last review: {}'.format(last_review))
-
     ease_factor = row['factor']/10
-    print('Ease factor: {}%'.format(ease_factor))
-
-    print('Reviews: {}'.format(row['reps']))
-    print('Lapses: {}'.format(row['lapses']))
-
+    reviews = row['reps']
+    lapses = row['lapses']
     reverse = (row['ord'] == 1)
-
-    # print note for that card
     note_id = row['nid']
     # id is unique
-    row = conn.execute("select mid,flds,tags from notes where id = ?", (note_id,)).fetchone()
-    if row:
-        print_note(conn, note_id, row['mid'], row['flds'], row['tags'], reverse=reverse)
+    note = conn.execute("select mid,flds,tags from notes where id = ?", (note_id,)).fetchone()
+
+    if not return_dict:
+        if not quiet:
+            print('# Card {} #'.format(row['id']), file=sys.stderr)
+        print('Due date: {}'.format(due_date))
+        print('Interval: {} days'.format(interval))
+        print('Last review: {}'.format(last_review))
+        print('Ease factor: {}%'.format(ease_factor))
+        print('Reviews: {}'.format(row['reps']))
+        print('Lapses: {}'.format(row['lapses']))
+
+        if note:
+            print_note(conn, note_id, note['mid'], note['flds'], note['tags'], reverse=reverse)
+    else:
+        card_dict = {'due_date': str(due_date), 'interval': interval, 'last_review': str(last_review),
+                       'ease_factor': ease_factor, 'reviews': reviews, 'lapses': lapses}
+        fields = print_fields(conn, note_id, note['mid'], note['flds'], _json=True, reverse=reverse)
+        note_dict = {note_id : {'fields': fields, 'tags': note['tags']}}
+        card_dict['note'] = note_dict
+        return card_dict
 
 def print_cards(conn, ids, _json=False):
     success = True
@@ -589,6 +596,10 @@ def print_cards(conn, ids, _json=False):
         if not quiet:
             print('Reading from stdin...', file=sys.stderr)
         ids = sys.stdin
+
+    if _json:
+        cards = collections.OrderedDict()
+
     for _id in ids:
         if isinstance(_id, str):
             try:
@@ -599,12 +610,21 @@ def print_cards(conn, ids, _json=False):
         # id is unique
         row = conn.execute("select id,nid,ord,due,ivl,factor,reps,lapses from cards where id = ?", (_id,)).fetchone()
         if row:
-            print_card(conn, row)
+            if not _json:
+                print_card(conn, row, return_dict=False)
+            else:
+                cards[_id] =  print_card(conn, row, return_dict=True)
         elif not quiet:
             print('Card with id', _id, 'not found, skipping',
                   file=sys.stderr)
             success = False
+
+    if _json:
+        print(json.dumps(cards))
     return success
+
+def dump_cards(conn, ids):
+    return print_cards(conn, ids, _json=True)
 
 
 quiet = False
@@ -632,6 +652,7 @@ def run():
         'search_tags': search_notes_tags,
         'search_cards': search_cards,
         'print_cards': print_cards,
+        'dump_cards': dump_cards,
         }
 
     # parsing command line
