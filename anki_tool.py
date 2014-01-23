@@ -129,10 +129,14 @@ def rename_tags(conn, tags, remove=False):
 def remove_tags(conn, tags):
     return rename_tags(conn, tags, remove=True)
 
-def get_card_ids(conn, note_id):
+def get_card_ids(conn, note_id, return_deck_id=False):
     card_ids = []
-    for row in conn.execute("select id from cards where nid = ?", (note_id,)):
+    deck_id = None
+    for row in conn.execute("select id,did from cards where nid = ?", (note_id,)):
         card_ids.append(row['id'])
+        deck_id = row['did']
+    if return_deck_id:
+        return card_ids, deck_id
     return card_ids
 
 def get_note_id(conn, card_id):
@@ -153,6 +157,7 @@ def search_notes(conn, regexps, only_field=None, only_tags=False, cards=False):
     success = False
     for row in conn.execute('select id,mid,flds,tags,sfld from notes'):
         tags = row['tags'].split()
+        card_ids, deck_id = get_card_ids(conn, row['id'], return_deck_id=True)
         if not tags:
             tags = [''] # so ^$ will match
 
@@ -170,6 +175,9 @@ def search_notes(conn, regexps, only_field=None, only_tags=False, cards=False):
             # removing html tags
             flds = re.sub('<[^>]*>', '', row['flds']).split('\x1f')
             ids = [str(row['id']), str(row['mid'])]
+            for card_id in card_ids:
+                ids.append(str(card_id))
+            ids.append(str(deck_id))
             targets = tags+ids+flds
 
         # searching
@@ -188,8 +196,6 @@ def search_notes(conn, regexps, only_field=None, only_tags=False, cards=False):
 
         # found will only be true if all patterns matched something
         if found:
-            card_ids = get_card_ids(conn, row['id'])
-
             # printing only the id to stdout, so output can be piped somewhere
             if not human_readable:
                 if not quiet:
