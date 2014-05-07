@@ -512,8 +512,9 @@ def print_note(conn, note_id, model_id, fields_str, tags_str, cards=None, revers
             print(card_id)
     print()
 
-def print_notes(conn, ids):
+def print_notes(conn, ids, _json=False):
     success = False
+    notes = {}
     if not ids:
         if not quiet:
             print('Reading from stdin...', file=sys.stderr)
@@ -528,8 +529,22 @@ def print_notes(conn, ids):
                       file=sys.stderr)
         else:
             success = True
-            print_note(conn, _id, row['mid'], row['flds'], row['tags'], cards=get_card_ids(conn, _id))
+            if not _json:
+                print_note(conn, _id, row['mid'], row['flds'], row['tags'], cards=get_card_ids(conn, _id))
+            else:
+                fields = create_fields_dict(conn, row['mid'], row['flds'], reverse=False)
+                notes[_id] = {
+                        'model_id' : row['mid'],
+                        'fields' : ordered_dict_to_lists(fields),
+                        'tags' : row['tags'],
+                        'cards' : get_card_ids(conn, _id),
+                        }
+    if _json:
+        print(json.dumps(notes))
     return success
+
+def dump_notes(conn, ids):
+    return print_notes(conn, ids, _json=True)
 
 def find_collection():
     default_locations = [
@@ -643,6 +658,7 @@ def run():
     commands = {
         'dump_fields': dump_notes_fields,
         'dump_tags': dump_notes_tags,
+        'dump_notes': dump_notes,
         'list_decks': list_decks,
         'list_models': list_models,
         'mv_tags': rename_tags,
