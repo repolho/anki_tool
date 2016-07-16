@@ -1,4 +1,5 @@
 #! /usr/bin/python3
+# -*- coding: utf-8 -*-
 
 import sys
 import os
@@ -93,11 +94,13 @@ def rename_tags(conn, tags, remove=False):
                 found = True
                 n += 1
                 del tagsdict[tag]
+                dsttag = re.sub(target, dst, tag)
                 if dst:
-                    tagsdict[dst] = -1
+                    tagsdict[dsttag] = -1
 
                 try:
-                    rename_tag_in_notes(conn, tag, dst)
+                    print("replace tag ", tag, " with ", dsttag)
+                    rename_tag_in_notes(conn, tag, dsttag)
                 except sqlite3.OperationalError:
                     return False
         if not found:
@@ -105,7 +108,9 @@ def rename_tags(conn, tags, remove=False):
                 print("Couldn't find tags matching ‘{}’, searching notes",
                       "for exact string.".format(target), file=sys.stderr)
             try:
-                rename_tag_in_notes(conn, target, dst)
+                dsttag = re.sub(target, dst, tag)
+                print("replace tag ", tag, " with ", dsttag, " (notfound?)")
+                rename_tag_in_notes(conn, target, dsttag)
             except sqlite3.OperationalError:
                 return False
 

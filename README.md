@@ -103,6 +103,10 @@ For example, to rename the tags "dinosaur" and "mammal" into "animal," one might
 
     $ anki_tool mv_tags '(dinosaur|mammal)' animal
 
+It also supports replacing with the content of a regex group:
+
+    $ anki_tool mv_tags "^leccion(.*)$" "spanish::leccion::\\1"
+
 ### print_fields ###
 
     Usage: anki_tool print_fields note_id [note_id]...
